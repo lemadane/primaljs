@@ -5,7 +5,9 @@
 > PrimalJS is a lightweight, production-capable SPA framework built directly on native browser JavaScript. Function components, tagged HTML templates, fine-grained Signals, direct DOM reactivity, declarative control flow (`<If>`, `<Switch>`, `<For>`, `<Try>`, `<Render>`, `<Async>`, `<Await>`), client-side Router, nested layouts (`<RouteOutlet>`), SVG namespace support, Web Components compatibility, development diagnostics (`dev: true`), SEO metadata management, DOM activation (`activate()`), and optional PWA support. No Virtual DOM. No compiler. No transpiler. No TypeScript required. No mandatory Node.js server.
 
 **Back to the fundamentals of JavaScript.**  
+
 **JavaScript stays JavaScript.**  
+
 **Serve it from anything.**
 
 ---
@@ -13,82 +15,166 @@
 ## Key Features
 
 - **Pure Native JavaScript**: Write ordinary ECMAScript modules (`.js`) without JSX, Babel, SWC, TypeScript, Vite, Webpack, or transpilation.
+
 - **Function Components Only**: Clean, predictable function components. No class components, no hook rules.
+
 - **Native Tagged-Template Literals**: `html`...`` templates parsed directly by native browser `<template>` parser.
+
 - **Fine-Grained Signals & Batching**: Direct real DOM text node and attribute binding updates. `batch(fn)` deduplicates subscriber writes, `untrack(fn)` reads Signals without dependency collection.
+
 - **Root Application Disposal**: `mount()` returns `{ dispose() }`. Completely teardowns components, reactive effects, Signal subscriptions, event listeners, refs (`ref.current = null`), and DOM nodes. Idempotent and clean re-mounting support.
+
 - **Native SVG & Web Components Compatibility**: Automatic SVG namespace creation (`http://www.w3.org/2000/svg`), viewBox casing, and `<foreignObject>` HTML subtrees. Web components pass props directly as DOM properties and custom events to handlers.
+
 - **Declarative Control Flow**: Native `<If>`, `<ElseIf>`, `<Else>`, `<Switch>`, `<Case>`, `<Default>`, `<For>`, `<Continue />`, `<Break />`, `<Try>`, `<Catch>`, `<Render>`, `<Async>`, `<Await>`, and `<Pending>` control-flow components without Virtual DOM or parent component re-renders.
+
 - **Client-Side SPA Router & Nested Layouts**: `createRouter({ routes })` with route hierarchy (`children: [...]`), `<RouteOutlet>` placeholder, layout DOM preservation (navigating child routes keeps parent layout DOM instance untouched), parameter matching (`/users/:id`), route guards (`beforeEnter`), redirects, scroll restoration, hash navigation, and focus management.
+
 - **Development Diagnostics & Global Error Handling**: `createApp({ dev: true, onError })` with `PrimalJSError` providing actionable error messages for structural misuse, duplicate keys, or uncaught exceptions.
+
 - **SEO & Head Metadata Management**: `head()` updates `<title>`, `<meta>`, `<link canonical>`, OpenGraph, and JSON-LD structured data dynamically.
+
 - **Prerender DOM Activation**: `activate(App, "#app")` attaches behavior directly to existing pre-rendered HTML without Virtual DOM tree diffing.
-- **Optional Zero-Dependency PWA**: Service worker registration, offline shell caching, and manifest handling.
+
+- **Optional Zero-Dependency PWA**: Service worker registration, update handling, and disposal management.
+
 - **Zero Virtual DOM**: Real DOM nodes created once. Signal updates mutate target DOM nodes directly.
+
 - **Component Runs Once**: Routine state changes do **not** re-execute component functions (`executions === 1`).
+
 - **Zero Production Server Requirements**: Serve static `index.html`, `app.js`, `app.css`, `primal.js` from Nginx, Apache, Caddy, Spring Boot, Go, PHP, Django, ASP.NET, or static CDNs.
 
 ---
 
-## Quick Start
+---
 
-### Direct Browser Load (No Build Step Required)
+## Step-by-Step Project Setup Guide
 
-`index.html`:
-```html
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <title>PrimalJS App</title>
-</head>
-<body>
+### Method 1: Zero-Build ES Module Setup (Recommended)
 
-<div id="app"></div>
+1. **Create your project folder & structure**:
+   ```bash
+   mkdir my-primal-app
+   cd my-primal-app
+   ```
 
-<script type="module" src="./app.js"></script>
 
-</body>
-</html>
-```
+2. **Copy `primal.js` (or install via npm)**:
+   ```bash
+   # Option A: Direct file copy (Zero Node.js dependency)
+   cp /path/to/primaljs/primal.js ./primal.js
 
-`app.js`:
-```javascript
-import {
-    html,
-    signal,
-    batch,
-    mount
-} from "./primal.js";
+   # Option B: npm installation
+   npm install primaljs
+   ```
 
-function App() {
-    const count = signal(0);
-    const text = signal("Hello");
 
-    function updateBoth() {
-        batch(() => {
-            count.value++;
-            text.value = "Updated";
-        });
-    }
+3. **Create `index.html`**:
+   ```html
+   <!DOCTYPE html>
+   <html lang="en">
+   <head>
+       <meta charset="UTF-8">
+       <meta name="viewport" content="width=device-width, initial-scale=1.0">
+       <title>My PrimalJS Application</title>
+   </head>
+   <body>
+       <!-- Application Mount Target -->
+       <div id="app"></div>
 
-    return html`
-        <main>
-            <h1>${text} PrimalJS</h1>
-            <button onclick=${updateBoth}>
-                Count: ${count}
-            </button>
-        </main>
-    `;
-}
+       <!-- ES Module Entrypoint -->
+       <script type="module" src="./src/main.js"></script>
+   </body>
+   </html>
+   ```
 
-const app = mount(App, "#app");
-// Later: app.dispose();
-```
+
+4. **Create `src/main.js`**:
+   ```javascript
+   import {
+       createApp,
+       createRouter,
+       RouteOutlet,
+       html,
+       signal,
+       computed,
+       head,
+       If,
+       For
+   } from "../primal.js";
+
+   // 1. Reactive State
+   const count = signal(0);
+   const doubleCount = computed(() => count.value * 2);
+
+   // 2. Main Layout & Pages
+   function Home() {
+       head({ title: "Home | PrimalJS App" });
+       return html`
+           <div>
+               <h2>Home Page</h2>
+               <p>Count: ${count} (Double: ${doubleCount})</p>
+               <button onclick=${() => count.value++}>Increment</button>
+           </div>
+       `;
+   }
+
+   function Layout() {
+       return html`
+           <div class="layout">
+               <nav>
+                   <a href="/">Home</a>
+               </nav>
+               <main>
+                   <RouteOutlet />
+               </main>
+           </div>
+       `;
+   }
+
+   // 3. Router Configuration
+   const router = createRouter({
+       routes: [
+           {
+               path: "/",
+               component: Layout,
+               children: [
+                   { path: "", component: Home }
+               ]
+           }
+       ]
+   });
+
+   // 4. Initialize & Mount App
+   const app = createApp({
+       router,
+       dev: true,
+       onError(err) {
+           console.error("[PrimalJS App Error]:", err);
+       }
+   });
+
+   app.mount("#app");
+   ```
+
+
+5. **Serve & View Locally**:
+   Run any static local web server (no build, bundle, or transpilation step required):
+   ```bash
+   # Using Node npx
+   npx serve .
+
+   # Or Python HTTP server
+   python3 -m http.server 8000
+   ```
+   Open `http://localhost:8000` in your browser.
 
 ---
 
+## Quick Start Example
+
 ## Core API Reference
+
 
 ### Reactivity, Batching & Refs
 ```javascript
@@ -110,6 +196,7 @@ const inputRef = ref();
 // In template: <input ref=${inputRef}>
 // After mount: inputRef.current.focus()
 ```
+
 
 ### Declarative Control Flow
 ```javascript
@@ -133,6 +220,7 @@ html`
     </Await>
 `
 ```
+
 
 ### Router & Nested Layouts
 ```javascript
@@ -173,12 +261,15 @@ app.mount("#app");
 
 ---
 
+
 ## Architecture Guarantees & Verification
 
 PrimalJS includes mandatory unit tests verifying fundamental architectural guarantees:
 
 1. **DOM Identity Test**: Verifies `headingBefore === headingAfter` when signals update or boundaries trigger.
+
 2. **Component Execution Test**: Verifies component function executes exactly once (`executions === 1`) on mount and never re-executes on state changes, error boundary resets, or async state transitions.
+
 3. **Declarative Control-Flow & Integration Test Suites**:
    - `test/batch_untrack.test.js` (`batch()`, `untrack()`)
    - `test/root_disposal.test.js` (`app.dispose()`, idempotency, re-mounting)
@@ -193,6 +284,7 @@ npm test
 ```
 
 ---
+
 
 ## License
 
