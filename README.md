@@ -275,8 +275,9 @@ html`
     </If>
 `
 
-#### 💡 Why `<If>` / `<ElseIf>` / `<Else>` is Important in PrimalJS:
+#### 💡`<If>` / `<ElseIf>` / `<Else>`
 - **Reactive Branch Swapping Without Parent Re-renders**: Evaluates condition functions (`when=${...}`) reactively and swaps real DOM node ranges directly without re-executing the enclosing parent component function.
+
 - **Automatic Lifecycle Cleanup**: When active branch switches, PrimalJS automatically disposes of unmounted branch contexts (`onDestroy` hooks, Signal effects, and event listeners).
 
 // Keyed List Iteration (<For>, <Continue />, <Break />, <Else>)
@@ -305,10 +306,13 @@ html`
     </For>
 `
 
-#### 💡 Why `<For>` is Important in PrimalJS:
+#### 💡 `<For>`:
 - **Keyed DOM Identity Preservation**: Re-orders, inserts, or removes only altered item DOM nodes when the array mutates, keeping unchanged item DOM node instances intact.
+
 - **Declarative Skip & Early Termination (`<Continue />` & `<Break />`)**: Controls iteration declaratively within template subtrees without manual `.filter()` array transformations.
+
 - **Empty Collection Fallback (`<Else>`)**: Renders fallback DOM content automatically when the collection is empty (`length === 0`), `null`, or `undefined`.
+
 - **Automatic Item Context Teardown**: Disposes of unmounted item contexts (`onDestroy` lifecycle hooks, event listeners, and Signals) when items are removed from the array.
 
 // Branch Matching (<Switch>, <Case>, <Default>)
@@ -331,7 +335,7 @@ html`
     </Switch>
 `
 
-#### 💡 Why `<Switch>` is Important in PrimalJS:
+#### 💡 `<Switch>`:
 - **First-Match-Wins & No Fallthrough**: Unlike JavaScript `switch` statements, `<Switch>` uses clean first-match-wins order with zero risk of fallthrough errors and no `break` statements required.
 - **Flexible Value & Predicate Matching**: Supports plain values, reactive Signals, arrays of values (`value=${["a", "b"]}`), and predicate functions (`value=${v => v > 10}`).
 - **Zero Parent Component Re-execution**: Updates active DOM branch ranges directly without re-executing the surrounding component function.
@@ -366,10 +370,14 @@ html`
     </Async>
 `
 
-#### 💡 Why `<Async>` & `<Await>` are Important in PrimalJS:
+#### 💡 `<Async>` & `<Await>`:
+
 - **Suspense-Like Async Declaratives**: Renders `<Pending>` placeholder UI during Promise resolution without blocking surrounding layout or re-executing parent component functions (`executions === 1`).
+
 - **Reactive Task Re-triggering**: `<Async task=${...}>` tracks reactive Signals used in task factories and automatically re-executes when dependencies update.
+
 - **Automatic Request Abort Cancellation (`{ signal }`)**: Supplies an `AbortSignal` to abort stale in-flight fetch requests when Signal state changes or components unmount.
+
 - **Built-in Error Recovery (`(err, retry)`)**: `<Catch>` provides a `retry` callback to re-trigger failed requests seamlessly.
 
 // Single Promise Resolution (<Await>)
@@ -403,16 +411,34 @@ html`
 - **`<Await promise=${promise}>`**: Takes a **direct Promise instance** (or function). Resolves a single Promise without auto-tracking outer Signal changes.
 
 // Dynamic Component Switcher (<Render>)
+function OverviewTab(props) {
+    return html`<div><h3>Overview Analytics</h3><p>User: ${props.user.name}</p></div>`;
+}
+
+function SettingsTab(props) {
+    return html`<div><h3>Account Settings</h3><p>User: ${props.user.name}</p></div>`;
+}
+
+// Reactive Signal holding a component function
 const activeTab = signal(OverviewTab);
+const currentUser = signal({ name: "Lemuel" });
 
 html`
-    <div class="tab-buttons">
-        <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
-        <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
-    </div>
+    <div class="dashboard">
+        <div class="tab-header">
+            <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
+            <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
+        </div>
 
-    <Render component=${activeTab} props=${{ user }} />
+        <!-- Dynamically mounts activeTab component and passes reactive props -->
+        <Render component=${activeTab} props=${{ user: currentUser }} />
+    </div>
 `
+
+#### 💡 `<Render>`:
+- **Preserves Single Component Execution (`executions === 1`)**: In PrimalJS, component functions execute **exactly once** on initial mount and do not re-run on routine state changes. `<Render>` enables switching dynamic components or pages reactively when a Signal changes **without re-executing the parent layout/container function**.
+- **Deterministic Teardown & Context Disposal**: When `component` changes, `<Render>` automatically cleans up the unmounted component's entire context tree (executes `onDestroy` hooks, unbinds event listeners, unsubscribes signals, and removes DOM nodes).
+- **Foundation for Router Outlets & Dynamic Layouts**: `<Render>` powers `<RouteOutlet>`, dynamic tabbed interfaces, multi-step forms, and polymorphic plugin slots seamlessly.
 // Declarative Error Boundaries (<Try>, <Catch>)
 const hasError = signal(false);
 
@@ -442,10 +468,14 @@ html`
     </Try>
 `
 
-#### 💡 Why `<Try>` / `<Catch>` is Important in PrimalJS:
+#### 💡 `<Try>` / `<Catch>`:
+
 - **Prevents Full-Application Crashes**: Wraps render errors, lifecycle `onMount` failures, and reactive Signal compute exceptions inside protective DOM boundaries.
+
 - **Graceful Recovery (`reset()`)**: The `<Catch>` callback receives `(err, reset)`, allowing users to recover state and remount subtrees cleanly without page reloads.
+
 - **Hierarchical Error Propagation**: Nearest nested `<Try>` catches errors first. Uncaught errors escalate up to parent `<Try>` boundaries or `createApp({ onError })`.
+
 - **Partial Teardown Safety**: Immediately cleans up partially rendered DOM nodes, event listeners, and Signal subscriptions if an exception fires mid-mount.
 
 ---
