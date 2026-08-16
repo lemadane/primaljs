@@ -227,7 +227,7 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
 
         // 2. Wait for resolution
         await page.waitForSelector(".status-box h3");
-        const loadedText = await page.$eval(".status-box p", el => el.textContent.trim());
+        const loadedText = await page.$eval(".status-box p:nth-of-type(2)", el => el.textContent.trim());
         assert.ok(loadedText.includes("User #1 (Lemuel)"));
 
         // 3. Click Trigger Network Error
@@ -241,7 +241,7 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         // 4. Click Load User #2
         await buttons[1].click(); // Load User #2
         await page.waitForSelector(".status-box h3");
-        const user2Text = await page.$eval(".status-box p", el => el.textContent.trim());
+        const user2Text = await page.$eval(".status-box p:nth-of-type(2)", el => el.textContent.trim());
         assert.ok(user2Text.includes("User #2 (Lemuel)"));
 
         await page.close();

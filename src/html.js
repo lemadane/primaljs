@@ -94,8 +94,7 @@ function compileTemplate(strings) {
     const capitalTags = findCapitalTagNames(rawHtml);
     const normalizedHtml = normalizeSelfClosingTags(rawHtml);
     const templateEl = document.createElement("template");
-    templateEl.innerHTML = normalizedHtml;
-    removeFormattingWhitespace(templateEl.content);
+    templateEl.innerHTML = normalizedHtml.trim();
 
     const instructions = [];
     const walk = (node, path) => {
@@ -177,7 +176,9 @@ function getNodeByPath(root, path) {
         const idx = path[i];
         if (!current || !current.childNodes) return null;
         let validChildren = Array.from(current.childNodes);
-        if (i === 0) {
+        if (i === 0 && current.nodeType === Node.ELEMENT_NODE) {
+            validChildren = validChildren.filter(n => n.nodeName !== "SCRIPT" && !(n.nodeType === 3 && !n.nodeValue.trim()));
+        } else if (i === 0) {
             validChildren = validChildren.filter(n => n.nodeName !== "SCRIPT");
         }
         current = validChildren[idx];
@@ -221,24 +222,26 @@ export function renderTemplate(templateResult, parentCtx = getCurrentContext()) 
     return fragment.childNodes.length === 1 ? fragment.firstChild : fragment;
 }
 
-function removeFormattingWhitespace(element) {
-    if (!element) return;
-    const children = Array.from(element.childNodes || []);
-    for (const child of children) {
-        if (child.nodeType === Node.TEXT_NODE && !child.nodeValue.trim()) {
-            element.removeChild(child);
-        } else if (child.nodeType === Node.ELEMENT_NODE) {
-            removeFormattingWhitespace(child);
+function findCommentMarker(root, valueIndex) {
+    if (!root || typeof document === "undefined") return null;
+    const markerTarget = `primal-ph-${valueIndex}`;
+    const bindTarget = `primal-bind:${valueIndex}`;
+    const filter = typeof NodeFilter !== "undefined" ? NodeFilter.SHOW_COMMENT : 128;
+    const iterator = document.createNodeIterator(root, filter, null);
+    let currentNode;
+    while ((currentNode = iterator.nextNode())) {
+        const text = currentNode.nodeValue ? currentNode.nodeValue.trim() : "";
+        if (text === markerTarget || text === bindTarget) {
+            return currentNode;
         }
     }
+    return null;
 }
 
 export function activateTemplate(existingDOMNode, templateResult, ctx = getCurrentContext()) {
     if (!existingDOMNode || !templateResult || !(templateResult instanceof TemplateResult)) {
         return;
     }
-
-    removeFormattingWhitespace(existingDOMNode);
 
     let cached = templateCache.get(templateResult.strings);
     if (!cached) {
@@ -251,15 +254,22 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
     for (let i = 0; i < cached.instructions.length; i++) {
         const spec = cached.instructions[i];
         let targetNode = targetNodes[i];
-        if (!targetNode && spec.path.length > 0) {
-            const parentEl = getNodeByPath(existingDOMNode, spec.path.slice(0, -1));
-            if (parentEl && parentEl.nodeType === Node.ELEMENT_NODE) {
-                const textNodes = Array.from(parentEl.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
-                if (textNodes.length > 0) {
-                    targetNode = textNodes[textNodes.length - 1];
+
+        if (spec.type === "content") {
+            const commentMarker = findCommentMarker(existingDOMNode, spec.valueIndex);
+            if (commentMarker) {
+                targetNode = commentMarker;
+            } else if (!targetNode && spec.path.length > 0) {
+                const parentEl = getNodeByPath(existingDOMNode, spec.path.slice(0, -1));
+                if (parentEl && parentEl.nodeType === Node.ELEMENT_NODE) {
+                    const textNodes = Array.from(parentEl.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                    if (textNodes.length > 0) {
+                        targetNode = textNodes[textNodes.length - 1];
+                    }
                 }
             }
         }
+
         if (targetNode && (spec.type === "event" || spec.type === "attribute")) {
             if (targetNode.nodeType === Node.TEXT_NODE) {
                 targetNode = targetNode.parentElement;
@@ -284,6 +294,13 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
 function bindContent(targetNode, value, ctx) {
     const parent = targetNode.parentNode;
     if (!parent) return;
+
+    if (value && (value.__isContinue || value.__isBreak || value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isCatch || value.__isPending)) {
+        const comment = document.createComment("primal:descriptor");
+        comment._primalDescriptor = value;
+        parent.replaceChild(comment, targetNode);
+        return;
+    }
 
     if (targetNode.nodeType === Node.TEXT_NODE && isSignal(value)) {
         const fullText = targetNode.nodeValue || "";
@@ -323,11 +340,19 @@ function createValueNode(value, ctx) {
 
         let activeCtx = null;
 
-        const disposer = effect(() => {
+        const cleanupActiveCtx = () => {
             if (activeCtx) {
+                if (ctx && ctx.children) {
+                    const idx = ctx.children.indexOf(activeCtx);
+                    if (idx !== -1) ctx.children.splice(idx, 1);
+                }
                 destroyContext(activeCtx);
                 activeCtx = null;
             }
+        };
+
+        const disposer = effect(() => {
+            cleanupActiveCtx();
             clearAnchorRange(startAnchor, endAnchor);
 
             const res = value();
@@ -336,6 +361,9 @@ function createValueNode(value, ctx) {
             activeCtx = new ComponentContext("DynamicFn");
             if (ctx) {
                 activeCtx.parent = ctx;
+                if (!ctx.children.includes(activeCtx)) {
+                    ctx.children.push(activeCtx);
+                }
                 activeCtx.templateValues = ctx.templateValues;
                 activeCtx.capitalTags = ctx.capitalTags;
                 if (ctx.tryBoundary) activeCtx.tryBoundary = ctx.tryBoundary;
@@ -351,7 +379,10 @@ function createValueNode(value, ctx) {
             }
         });
 
-        if (ctx) ctx.addEffect(disposer);
+        if (ctx) {
+            ctx.addEffect(disposer);
+            ctx.addEffect(cleanupActiveCtx);
+        }
         return frag;
     }
     if (value instanceof TemplateResult) {
@@ -557,8 +588,8 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
             const index = parseInt(attr.name.replace("primal-attr-", ""), 10);
             const targetPropName = attr.value;
             props[targetPropName] = templateValues[index];
-        } else {
-            if (attr.name !== "primal-comp") {
+        } else if (attr.name !== "primal-comp" && !(typeof attr.value === "string" && attr.value.startsWith("primal-attr-"))) {
+            if (!(attr.name in props)) {
                 props[attr.name] = attr.value;
             }
         }

@@ -883,15 +883,28 @@ function renderItemNodes(item, index, renderItem, props, itemCtx) {
     let isBroken = false;
 
     for (const node of rawNodes) {
+        if (isFormattingWhitespace(node)) {
+            continue;
+        }
         let descriptor = (node && node._primalDescriptor) ? node._primalDescriptor : null;
         if (!descriptor && node && node.nodeType === Node.ELEMENT_NODE) {
             const tagName = node.nodeName.toUpperCase();
-            if (tagName === "CONTINUE") {
-                const whenAttr = node.getAttribute("when");
-                descriptor = { __isContinue: true, when: whenAttr };
-            } else if (tagName === "BREAK") {
-                const whenAttr = node.getAttribute("when");
-                descriptor = { __isBreak: true, when: whenAttr };
+            if (tagName === "CONTINUE" || tagName === "BREAK") {
+                const templateValues = itemCtx && itemCtx.templateValues ? itemCtx.templateValues : [];
+                let whenVal = node.getAttribute("when");
+                for (let i = 0; i < node.attributes.length; i++) {
+                    const attr = node.attributes[i];
+                    if (attr.name.startsWith("primal-attr-") && attr.value === "when") {
+                        const idx = parseInt(attr.name.replace("primal-attr-", ""), 10);
+                        whenVal = templateValues[idx];
+                        break;
+                    }
+                }
+                descriptor = {
+                    __isContinue: tagName === "CONTINUE",
+                    __isBreak: tagName === "BREAK",
+                    when: whenVal
+                };
             }
         }
 

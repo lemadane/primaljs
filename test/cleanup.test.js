@@ -57,4 +57,47 @@ describe("PrimalJS Lifecycle & Memory Management Cleanup", () => {
         count.value = 2;
         assert.equal(appEl.textContent.trim(), "");
     });
+
+    it("registers and recursively disposes DynamicFn reactive function context when parent component unmounts", () => {
+        let childMounted = false;
+        let childDestroyed = false;
+
+        const toggle = signal(true);
+
+        function App() {
+            return html`
+                <div>
+                    ${() => toggle.value ? html`
+                        <div>${() => {
+                            onMount(() => { childMounted = true; });
+                            onDestroy(() => { childDestroyed = true; });
+                            return "Dynamic Content";
+                        }}</div>
+                    ` : null}
+                </div>
+            `;
+        }
+
+        const appEl = document.getElementById("app");
+        mount(App, appEl);
+        assert.equal(childMounted, true);
+        assert.equal(childDestroyed, false);
+
+        toggle.value = false;
+        assert.equal(childDestroyed, true, "DynamicFn context and nested lifecycle hooks must be disposed");
+
+        unmount(appEl);
+    });
+
+    it("preserves semantically meaningful whitespace between HTML elements in tagged templates", () => {
+        function SpaceComp() {
+            return html`<span>Hello</span> <span>World</span>`;
+        }
+
+        const appEl = document.getElementById("app");
+        mount(SpaceComp, appEl);
+        assert.equal(appEl.textContent, "Hello World", "Whitespace between tags must be preserved");
+
+        unmount(appEl);
+    });
 });
