@@ -247,22 +247,44 @@ function createValueNode(value, ctx) {
     }
     if (value instanceof Node) {
         if (value.nodeType === Node.ELEMENT_NODE) {
-            const tagUpper = value.nodeName.toUpperCase();
+            const tValues = (ctx && ctx.templateValues) ? ctx.templateValues : [];
             const cTags = (ctx && ctx.capitalTags) ? ctx.capitalTags : new Set();
+            const tagUpper = value.nodeName.toUpperCase();
+
             if (cTags.has(tagUpper) || value.hasAttribute("primal-comp")) {
-                const subComp = getComponent(value.nodeName);
+                const cleanName = value.getAttribute("primal-comp") || value.nodeName.replace(/-COMPONENT$/i, "");
+                const subComp = getComponent(cleanName);
                 if (subComp) {
                     const placeholder = value.cloneNode(true);
                     placeholder.removeAttribute("primal-comp");
                     const dummy = document.createElement("div");
                     dummy.appendChild(placeholder);
-                    const tValues = (ctx && ctx.templateValues) ? ctx.templateValues : [];
                     instantiateComponentNode(placeholder, subComp, tValues, ctx, cTags);
                     const frag = document.createDocumentFragment();
                     while (dummy.firstChild) {
                         frag.appendChild(dummy.firstChild);
                     }
                     return frag;
+                }
+            }
+            const subComps = Array.from(value.querySelectorAll("*")).filter(el => {
+                const cleanName = el.getAttribute("primal-comp") || el.nodeName.replace(/-COMPONENT$/i, "");
+                if (!getComponent(cleanName)) return false;
+                let parent = el.parentElement;
+                while (parent && parent !== value) {
+                    const parentClean = parent.getAttribute("primal-comp") || parent.nodeName.replace(/-COMPONENT$/i, "");
+                    if (getComponent(parentClean)) {
+                        return false;
+                    }
+                    parent = parent.parentElement;
+                }
+                return true;
+            });
+            for (const el of subComps) {
+                const compName = el.getAttribute("primal-comp") || el.nodeName.replace(/-COMPONENT$/i, "");
+                const subComp = getComponent(compName);
+                if (subComp) {
+                    instantiateComponentNode(el, subComp, tValues, ctx, cTags);
                 }
             }
         }
@@ -289,7 +311,7 @@ function createValueNode(value, ctx) {
 
 function bindEvent(targetElement, attrName, handler, ctx) {
     if (typeof handler !== "function") return;
-    const eventName = attrName.slice(2).toLowerCase();
+    const eventName = attrName.startsWith("on") ? attrName.slice(2).toLowerCase() : attrName.toLowerCase();
     const tryBoundary = ctx ? ctx.tryBoundary : null;
 
     const wrappedHandler = (event) => {
@@ -299,7 +321,7 @@ function bindEvent(targetElement, attrName, handler, ctx) {
             if (tryBoundary && typeof tryBoundary.handleError === "function" && !tryBoundary.isDestroyed) {
                 tryBoundary.handleError(err);
             } else {
-                throw err;
+                console.error(`Error in event handler for ${eventName}:`, err);
             }
         }
     };
@@ -314,6 +336,10 @@ function bindEvent(targetElement, attrName, handler, ctx) {
 }
 
 function bindAttribute(targetElement, attrName, value, ctx) {
+    if (attrName.startsWith("on") && (typeof value === "function" || isSignal(value))) {
+        bindEvent(targetElement, attrName, value, ctx);
+        return;
+    }
     if (attrName === "ref") {
         if (isRef(value)) {
             value.current = targetElement;
@@ -427,6 +453,12 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
     }
 
     const compCtx = new ComponentContext(componentFn.name || "Component");
+    if (parentCtx) {
+        compCtx.parent = parentCtx;
+        if (!parentCtx.children.includes(compCtx)) {
+            parentCtx.children.push(compCtx);
+        }
+    }
     compCtx.templateValues = templateValues;
     compCtx.capitalTags = capitalTags;
     if (parentCtx && parentCtx.tryBoundary) {
@@ -479,6 +511,13 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
  * Resolves inner placeholders (comments, attributes) inside a component placeholder's subtree.
  */
 export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags = new Set()) {
+    if (!rootNode || rootNode.nodeType !== Node.ELEMENT_NODE) return;
+
+    const rootClean = rootNode.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
+    if (capitalTags.has(rootClean) || getComponent(rootClean) || rootNode.hasAttribute("primal-comp")) {
+        return;
+    }
+
     const childrenToProcess = Array.from(rootNode.childNodes || []);
     for (const node of childrenToProcess) {
         if (!node.parentNode) continue;
@@ -491,6 +530,10 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
                 bindContent(node, val, ctx);
             }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
+            const cleanName = node.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
+            if (capitalTags.has(cleanName) || getComponent(cleanName) || node.hasAttribute("primal-comp")) {
+                continue;
+            }
             for (let i = node.attributes.length - 1; i >= 0; i--) {
                 const attr = node.attributes[i];
                 if (attr.name.startsWith("primal-attr-")) {

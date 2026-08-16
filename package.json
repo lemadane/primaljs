@@ -1,12 +1,20 @@
 {
   "name": "primaljs",
-  "version": "1.0.0",
+  "version": "0.1.0-alpha.1",
   "description": "Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real DOM Updates, No Virtual DOM, No Compiler.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
     "./primal.js": "./primal.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/lemadane/primaljs.git"
+  },
+  "homepage": "https://github.com/lemadane/primaljs#readme",
+  "bugs": {
+    "url": "https://github.com/lemadane/primaljs/issues"
   },
   "scripts": {
     "test": "node --test test/*.test.js"

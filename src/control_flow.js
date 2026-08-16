@@ -13,7 +13,7 @@ import {
     destroyContext,
     onDestroy
 } from "./lifecycle.js";
-import { convertToDOMNode } from "./html.js";
+import { convertToDOMNode, resolveInnerSubtree } from "./html.js";
 
 /**
  * <ElseIf> Component helper
@@ -63,10 +63,10 @@ export function Case(props) {
     if (props && props.when !== undefined) modeCount++;
 
     if (modeCount === 0) {
-        throw new Error("<Case> requires exactly one matching criteria (value, values, or when).");
+        throw new Error("<Case> must specify exactly one matching mode.");
     }
     if (modeCount > 1) {
-        throw new Error("<Case> criteria (value, values, when) are mutually exclusive. Specify only one.");
+        throw new Error("<Case> cannot specify multiple matching modes.");
     }
 
     if (props && props.values !== undefined && !Array.isArray(props.values)) {
@@ -160,7 +160,7 @@ export function Catch(props) {
     const isInsideAwait = ctx && (ctx.name === "Await" || (ctx.parent && ctx.parent.name === "Await"));
     const isInsideAsync = ctx && (ctx.name === "Async" || (ctx.parent && ctx.parent.name === "Async"));
     if (!isInsideTry && !isInsideAwait && !isInsideAsync && (!props || !props.__isControlFlowChild)) {
-        throw new Error("<Catch> must be a direct child of a <Try>, <Await>, or <Async> container.");
+        throw new Error("<Catch> must be a direct child of a <Try> container.");
     }
 
     let fn = typeof (props ? props.children : undefined) === "function" ? props.children : undefined;
@@ -913,12 +913,7 @@ function renderItemNodes(item, index, renderItem, props, itemCtx) {
             continue;
         }
 
-        if (node && node.nodeType === Node.ELEMENT_NODE) {
-            const cloned = node.cloneNode(true);
-            finalNodes.push(convertToDOMNode(cloned, itemCtx));
-        } else {
-            finalNodes.push(node);
-        }
+        finalNodes.push(node);
     }
 
     return { finalNodes, isContinued, isBroken };
@@ -979,6 +974,9 @@ export function If(props) {
             try {
                 const nodes = targetBranch.content.map(c => {
                     const cloned = c instanceof Node ? c.cloneNode(true) : c;
+                    if (cloned && cloned.nodeType === Node.ELEMENT_NODE && cloned.innerHTML && cloned.innerHTML.includes("primal-ph-")) {
+                        resolveInnerSubtree(cloned, activeBranchCtx.templateValues, activeBranchCtx, activeBranchCtx.capitalTags);
+                    }
                     return convertToDOMNode(cloned, activeBranchCtx);
                 });
                 branchDOM = document.createDocumentFragment();
@@ -1052,7 +1050,7 @@ export function Switch(props) {
                     break;
                 }
             } else if (branch.when !== undefined) {
-                const isMatch = evaluateCondition(branch.when);
+                const isMatch = typeof branch.when === "function" ? Boolean(branch.when(targetVal)) : evaluateCondition(branch.when);
                 if (isMatch) {
                     selectedIndex = i;
                     break;
@@ -1088,6 +1086,9 @@ export function Switch(props) {
             try {
                 const nodes = targetBranch.content.map(c => {
                     const cloned = c instanceof Node ? c.cloneNode(true) : c;
+                    if (cloned && cloned.nodeType === Node.ELEMENT_NODE && cloned.innerHTML && cloned.innerHTML.includes("primal-ph-")) {
+                        resolveInnerSubtree(cloned, activeBranchCtx.templateValues, activeBranchCtx, activeBranchCtx.capitalTags);
+                    }
                     return convertToDOMNode(cloned, activeBranchCtx);
                 });
                 branchDOM = document.createDocumentFragment();
@@ -1201,25 +1202,14 @@ export function For(props) {
             }
 
             if (newKeysSeen.has(key)) {
-                throw new Error(`Duplicate key '${key}' detected in <For> iteration.`);
+                throw new Error(`<For> detected duplicate key '${key}'.`);
             }
             newKeysSeen.add(key);
 
             let record = itemCache.get(key);
             if (record) {
-                const { finalNodes, isContinued, isBroken } = renderItemNodes(rawItem, i, renderItem, props, record.ctx);
-
-                if (isContinued) {
-                    continue;
-                }
-
                 record.index = i;
-                record.nodes = finalNodes;
                 newRecords.push(record);
-
-                if (isBroken) {
-                    break;
-                }
             } else {
                 const itemCtx = new ComponentContext(`ForItem:${key}`);
                 itemCtx.templateValues = props.__templateValues || [];
@@ -1436,7 +1426,6 @@ export function Try(props) {
                 if (node) protectedDOM.appendChild(node);
             }
         } catch (err) {
-            popContext();
             tryBoundary.handleError(err);
             return;
         } finally {
@@ -1477,6 +1466,7 @@ export function Await(props) {
 
     let activeSubtreeCtx = null;
     let operationId = 0;
+    let activeController = null;
 
     const clearActiveSubtree = () => {
         if (activeSubtreeCtx) {
@@ -1549,7 +1539,6 @@ export function Await(props) {
                 resolvedDOM = convertToDOMNode(cloned, activeSubtreeCtx);
             }
         } catch (err) {
-            popContext();
             const tryBoundary = activeSubtreeCtx.tryBoundary || (ctx ? ctx.tryBoundary : null);
             if (tryBoundary && typeof tryBoundary.handleError === "function") {
                 tryBoundary.handleError(err);
@@ -1618,11 +1607,16 @@ export function Await(props) {
     const executePromiseFactory = () => {
         operationId++;
         const currentOp = operationId;
+        if (activeController) {
+            try { activeController.abort(); } catch (_) {}
+            activeController = null;
+        }
+        activeController = typeof AbortController !== "undefined" ? new AbortController() : null;
 
         const targetProp = (props && props.for !== undefined) ? props.for : (props ? props.promise : undefined);
         let promiseVal;
         if (typeof targetProp === "function") {
-            promiseVal = targetProp();
+            promiseVal = targetProp({ signal: activeController ? activeController.signal : undefined });
         } else if (isSignal(targetProp)) {
             promiseVal = targetProp.value;
         } else {
@@ -1652,6 +1646,11 @@ export function Await(props) {
 
     if (ctx) {
         ctx.addDestroyHook(() => {
+            operationId++;
+            if (activeController) {
+                activeController.abort();
+                activeController = null;
+            }
             clearActiveSubtree();
         });
     }
@@ -1675,6 +1674,7 @@ export function Async(props) {
 
     let activeSubtreeCtx = null;
     let operationId = 0;
+    let activeController = null;
 
     const clearActiveSubtree = () => {
         if (activeSubtreeCtx) {
@@ -1759,7 +1759,6 @@ export function Async(props) {
             const res = CompFn(passProps);
             compDOM = convertToDOMNode(res, activeSubtreeCtx);
         } catch (err) {
-            popContext();
             const tryBoundary = activeSubtreeCtx.tryBoundary || (ctx ? ctx.tryBoundary : null);
             if (tryBoundary && typeof tryBoundary.handleError === "function") {
                 tryBoundary.handleError(err);
@@ -1828,10 +1827,15 @@ export function Async(props) {
     const loadAsyncComponent = () => {
         operationId++;
         const currentOp = operationId;
+        if (activeController) {
+            try { activeController.abort(); } catch (_) {}
+            activeController = null;
+        }
+        activeController = typeof AbortController !== "undefined" ? new AbortController() : null;
 
         let compTarget;
         if (typeof props.component === "function") {
-            compTarget = props.component();
+            compTarget = props.component({ signal: activeController ? activeController.signal : undefined });
         } else if (isSignal(props.component)) {
             compTarget = props.component.value;
         } else {
@@ -1847,7 +1851,7 @@ export function Async(props) {
         } else if (typeof compTarget === "function" && compTarget.prototype === undefined) {
             mountPending();
             try {
-                const promise = compTarget();
+                const promise = compTarget({ signal: activeController ? activeController.signal : undefined });
                 if (promise && typeof promise.then === "function") {
                     promise.then(
                         mod => mountComponent(mod, currentOp),
@@ -1875,6 +1879,11 @@ export function Async(props) {
 
     if (ctx) {
         ctx.addDestroyHook(() => {
+            operationId++;
+            if (activeController) {
+                try { activeController.abort(); } catch (_) {}
+                activeController = null;
+            }
             clearActiveSubtree();
         });
     }

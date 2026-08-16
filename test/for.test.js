@@ -110,14 +110,14 @@ describe("PrimalJS Declarative For Loop Control-Flow (<For>, <Continue>, <Break>
         const appEl = document.getElementById("app");
         mount(App, appEl);
 
-        assert.equal(Array.from(document.querySelectorAll(".sig")).map(el => el.textContent), ["A", "B"]);
-        assert.equal(Array.from(document.querySelectorAll(".comp")).map(el => el.textContent), ["a", "b"]);
-        assert.equal(Array.from(document.querySelectorAll(".get")).map(el => el.textContent), ["A!", "B!"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".sig")).map(el => el.textContent), ["A", "B"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".comp")).map(el => el.textContent), ["a", "b"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".get")).map(el => el.textContent), ["A!", "B!"]);
 
         list.value = ["A", "B", "C"];
-        assert.equal(Array.from(document.querySelectorAll(".sig")).map(el => el.textContent), ["A", "B", "C"]);
-        assert.equal(Array.from(document.querySelectorAll(".comp")).map(el => el.textContent), ["a", "b", "c"]);
-        assert.equal(Array.from(document.querySelectorAll(".get")).map(el => el.textContent), ["A!", "B!", "C!"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".sig")).map(el => el.textContent), ["A", "B", "C"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".comp")).map(el => el.textContent), ["a", "b", "c"]);
+        assert.deepEqual(Array.from(document.querySelectorAll(".get")).map(el => el.textContent), ["A!", "B!", "C!"]);
     });
 
     it("8, 9, 11, 29, 30, 31. <Else> empty collection fallback, optional Else, transition empty <-> non-empty", () => {

@@ -1,16 +1,21 @@
 /**
  * PrimalJS DOM Activation Engine
- * Attaches Signal bindings and event listeners directly to existing prerendered HTML without Virtual DOM tree diffing.
+ * Attaches Signal bindings, event listeners, and lifecycle hooks directly to existing pre-rendered HTML DOM without clearing innerHTML or recreating nodes.
  */
 
-import { mount } from "./mount.js";
+import { ComponentContext, pushContext, popContext, triggerMount, destroyContext } from "./lifecycle.js";
+import { unmount } from "./mount.js";
 
 export function activate(App, target, initialState = {}) {
     if (typeof document === "undefined") return null;
 
-    let targetEl = typeof target === "string" ? document.querySelector(target) : target;
+    const targetEl = typeof target === "string" ? document.querySelector(target) : target;
     if (!targetEl) {
         throw new Error(`[PrimalJS activate] Target element '${target}' not found in document.`);
+    }
+
+    if (targetEl._primalCtx) {
+        unmount(targetEl);
     }
 
     const stateScript = document.getElementById("primal-state");
@@ -23,17 +28,37 @@ export function activate(App, target, initialState = {}) {
         }
     }
 
+    // Hydrate state markers on existing DOM elements without clearing container
     const bindElements = targetEl.querySelectorAll("[data-primal-bind]");
     if (bindElements.length > 0) {
-        // Activate existing DOM elements with binding markers
         for (const el of bindElements) {
             const bindId = el.getAttribute("data-primal-bind");
-            if (serializedState[bindId] !== undefined) {
+            if (serializedState[bindId] !== undefined && el.textContent !== String(serializedState[bindId])) {
                 el.textContent = serializedState[bindId];
             }
         }
     }
 
-    // Mount application behavior onto root
-    return mount(App, targetEl);
+    const rootCtx = new ComponentContext(App.name || "Root");
+    targetEl._primalCtx = rootCtx;
+
+    pushContext(rootCtx);
+    try {
+        if (typeof App === "function") {
+            App(serializedState);
+        }
+    } finally {
+        popContext();
+    }
+
+    // Trigger onMount hooks recursively on activated DOM context
+    triggerMount(rootCtx);
+
+    const appHandle = {
+        dispose() {
+            unmount(targetEl);
+        }
+    };
+
+    return appHandle;
 }

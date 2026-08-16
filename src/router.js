@@ -206,9 +206,7 @@ export class Router {
             meta: leafMeta
         };
 
-        if (leafMeta) {
-            head(leafMeta);
-        }
+        head(leafMeta);
 
         if (typeof window !== "undefined") {
             if (hash) {

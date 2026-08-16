@@ -50,6 +50,16 @@ export function createApp(config = {}) {
 
     let mountedAppHandle = null;
 
+    const disposeApp = () => {
+        if (router && typeof router.destroy === "function") {
+            router.destroy();
+        }
+        if (mountedAppHandle && typeof mountedAppHandle.dispose === "function") {
+            mountedAppHandle.dispose();
+            mountedAppHandle = null;
+        }
+    };
+
     return {
         mount(target) {
             if (router) {
@@ -57,25 +67,27 @@ export function createApp(config = {}) {
                 if (targetEl) {
                     targetEl.innerHTML = "";
                     mountedAppHandle = mount(() => router.RouterView(), targetEl);
-                    return mountedAppHandle;
+                    return {
+                        dispose: disposeApp
+                    };
                 }
                 return;
             }
             if (rootComponent) {
                 mountedAppHandle = mount(rootComponent, target);
-                return mountedAppHandle;
+                return {
+                    dispose: disposeApp
+                };
             }
         },
         activate(target, initialState) {
             if (rootComponent) {
-                return activate(rootComponent, target, initialState);
+                mountedAppHandle = activate(rootComponent, target, initialState);
+                return {
+                    dispose: disposeApp
+                };
             }
         },
-        dispose() {
-            if (mountedAppHandle && typeof mountedAppHandle.dispose === "function") {
-                mountedAppHandle.dispose();
-                mountedAppHandle = null;
-            }
-        }
+        dispose: disposeApp
     };
 }

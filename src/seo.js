@@ -1,34 +1,61 @@
 /**
- * PrimalJS SEO & Head Metadata Management
+ * PrimalJS SEO & Head Metadata Management Engine
+ * Dynamically updates and cleans up stale head metadata when navigating between routes.
  */
+
+let initialTitle = typeof document !== "undefined" ? document.title : "";
 
 export function head(meta = {}) {
     if (typeof document === "undefined") return;
 
-    if (meta.title) {
-        document.title = meta.title;
-        setMetaTag("property", "og:title", meta.title);
+    const m = meta || {};
+
+    // 1. Title
+    if (m.title) {
+        document.title = m.title;
+        setMetaTag("property", "og:title", m.title);
+    } else {
+        if (initialTitle) {
+            document.title = initialTitle;
+        }
+        removeMetaTag("property", "og:title");
     }
 
-    if (meta.description) {
-        setMetaTag("name", "description", meta.description);
-        setMetaTag("property", "og:description", meta.description);
+    // 2. Description
+    if (m.description) {
+        setMetaTag("name", "description", m.description);
+        setMetaTag("property", "og:description", m.description);
+    } else {
+        removeMetaTag("name", "description");
+        removeMetaTag("property", "og:description");
     }
 
-    if (meta.image) {
-        setMetaTag("property", "og:image", meta.image);
+    // 3. Image
+    if (m.image) {
+        setMetaTag("property", "og:image", m.image);
+    } else {
+        removeMetaTag("property", "og:image");
     }
 
-    if (meta.robots) {
-        setMetaTag("name", "robots", meta.robots);
+    // 4. Robots
+    if (m.robots) {
+        setMetaTag("name", "robots", m.robots);
+    } else {
+        removeMetaTag("name", "robots");
     }
 
-    if (meta.canonical) {
-        setLinkTag("canonical", meta.canonical);
+    // 5. Canonical URL
+    if (m.canonical) {
+        setLinkTag("canonical", m.canonical);
+    } else {
+        removeLinkTag("canonical");
     }
 
-    if (meta.structuredData) {
-        setStructuredData(meta.structuredData);
+    // 6. JSON-LD Structured Data
+    if (m.structuredData || m.jsonLd) {
+        setStructuredData(m.structuredData || m.jsonLd);
+    } else {
+        removeStructuredData();
     }
 }
 
@@ -42,6 +69,13 @@ function setMetaTag(keyAttr, keyVal, contentVal) {
     el.setAttribute("content", contentVal);
 }
 
+function removeMetaTag(keyAttr, keyVal) {
+    const el = document.querySelector(`meta[${keyAttr}="${keyVal}"]`);
+    if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+    }
+}
+
 function setLinkTag(relVal, hrefVal) {
     let el = document.querySelector(`link[rel="${relVal}"]`);
     if (!el) {
@@ -52,6 +86,13 @@ function setLinkTag(relVal, hrefVal) {
     el.setAttribute("href", hrefVal);
 }
 
+function removeLinkTag(relVal) {
+    const el = document.querySelector(`link[rel="${relVal}"]`);
+    if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+    }
+}
+
 function setStructuredData(data) {
     let el = document.querySelector(`script[type="application/ld+json"]`);
     if (!el) {
@@ -60,4 +101,11 @@ function setStructuredData(data) {
         document.head.appendChild(el);
     }
     el.textContent = typeof data === "string" ? data : JSON.stringify(data);
+}
+
+function removeStructuredData() {
+    const el = document.querySelector(`script[type="application/ld+json"]`);
+    if (el && el.parentNode) {
+        el.parentNode.removeChild(el);
+    }
 }

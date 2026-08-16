@@ -1,4 +1,5 @@
 import { JSDOM } from "jsdom";
+import { beforeEach } from "node:test";
 
 const dom = new JSDOM("<!DOCTYPE html><html><body><div id=\"app\"></div></body></html>", {
     url: "http://localhost/"
@@ -8,6 +9,7 @@ dom.window.scrollTo = () => {};
 
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
+globalThis.navigator = dom.window.navigator;
 globalThis.Node = dom.window.Node;
 globalThis.NodeFilter = dom.window.NodeFilter;
 globalThis.HTMLElement = dom.window.HTMLElement;
@@ -18,3 +20,9 @@ globalThis.DocumentFragment = dom.window.DocumentFragment;
 globalThis.customElements = dom.window.customElements;
 globalThis.Event = dom.window.Event;
 globalThis.CustomEvent = dom.window.CustomEvent;
+globalThis.AbortController = globalThis.AbortController || dom.window.AbortController;
+globalThis.AbortSignal = globalThis.AbortSignal || dom.window.AbortSignal;
+
+beforeEach(() => {
+    document.body.innerHTML = '<div id="app"></div>';
+});

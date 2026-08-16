@@ -64,7 +64,7 @@ export function triggerMount(ctx) {
     }
     ctx.mountHooks = [];
 
-    for (const child of ctx.children) {
+    for (const child of [...ctx.children]) {
         triggerMount(child);
     }
 }
