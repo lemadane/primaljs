@@ -1,75 +1,99 @@
 # PrimalJS
 
-**The Super Minimalists’ ReactJS**
+> **The Super Minimalists’ ReactJS**
 
-> PrimalJS is a lightweight, production-capable SPA framework built directly on native browser JavaScript. Function components, tagged HTML templates, fine-grained Signals, direct DOM reactivity, declarative control flow (`<If>`, `<Switch>`, `<For>`, `<Try>`, `<Render>`, `<Async>`, `<Await>`), client-side Router, nested layouts (`<RouteOutlet>`), SVG namespace support, Web Components compatibility, development diagnostics (`dev: true`), SEO metadata management, DOM activation (`activate()`), and optional PWA support. No Virtual DOM. No compiler. No transpiler. No TypeScript required. No mandatory Node.js server.
-
-**Back to the fundamentals of JavaScript.**  
-
-**JavaScript stays JavaScript.**  
-
-**Serve it from anything.**
+PrimalJS is a lightweight, production-capable Single Page Application (SPA) framework built directly on modern browser JavaScript. Back to the fundamentals of web development — **JavaScript stays JavaScript**.
 
 ---
 
-## Key Features
+## 🎯 Core PrimalJS Principles
 
-- **Pure Native JavaScript**: Write ordinary ECMAScript modules (`.js`) without JSX, Babel, SWC, TypeScript, Vite, Webpack, or transpilation.
+- **Pure JavaScript**: Standard ECMAScript modules (`.js`) parsed directly by native browser engines.
 
 - **Function Components Only**: Clean, predictable function components. No class components, no hook rules.
 
-- **Native Tagged-Template Literals**: `html`...`` templates parsed directly by native browser `<template>` parser.
+- **Native Tagged-Template Literals**: `html`...`` templates parsed directly using standard browser `<template>` elements.
+- **No JSX Compiler**: Write pure template strings without Babel, SWC, or 
+compilation steps.
 
-- **Fine-Grained Signals & Batching**: Direct real DOM text node and attribute binding updates. `batch(fn)` deduplicates subscriber writes, `untrack(fn)` reads Signals without dependency collection.
+- **No Transpiler**: Zero build steps required to run in production or development.
 
-- **Root Application Disposal**: `mount()` returns `{ dispose() }`. Completely teardowns components, reactive effects, Signal subscriptions, event listeners, refs (`ref.current = null`), and DOM nodes. Idempotent and clean re-mounting support.
+- **No Runtime JavaScript AST**: Native parsing without heavy runtime string-to-AST evaluators.
 
-- **Native SVG & Web Components Compatibility**: Automatic SVG namespace creation (`http://www.w3.org/2000/svg`), viewBox casing, and `<foreignObject>` HTML subtrees. Web components pass props directly as DOM properties and custom events to handlers.
+- **No Virtual DOM**: Real DOM nodes created once. Signal updates mutate target text and attributes directly.
 
-- **Declarative Control Flow**: Native `<If>`, `<ElseIf>`, `<Else>`, `<Switch>`, `<Case>`, `<Default>`, `<For>`, `<Continue />`, `<Break />`, `<Try>`, `<Catch>`, `<Render>`, `<Async>`, `<Await>`, and `<Pending>` control-flow components without Virtual DOM or parent component re-renders.
+- **No React-Style Reconciliation**: Avoid expensive tree diffing algorithms entirely.
 
-- **Client-Side SPA Router & Nested Layouts**: `createRouter({ routes })` with route hierarchy (`children: [...]`), `<RouteOutlet>` placeholder, layout DOM preservation (navigating child routes keeps parent layout DOM instance untouched), parameter matching (`/users/:id`), route guards (`beforeEnter`), redirects, scroll restoration, hash navigation, and focus management.
+- **No Component Re-Render for Ordinary Signal Changes**: Component functions execute **exactly once** on mount (`executions === 1`). Routine state updates never re-run component functions.
 
-- **Development Diagnostics & Global Error Handling**: `createApp({ dev: true, onError })` with `PrimalJSError` providing actionable error messages for structural misuse, duplicate keys, or uncaught exceptions.
+- **Signals Update the Smallest Possible Real-DOM Binding**: Fine-grained Signal writes pinpoint and update exact text nodes and attributes.
 
-- **SEO & Head Metadata Management**: `head()` updates `<title>`, `<meta>`, `<link canonical>`, OpenGraph, and JSON-LD structured data dynamically.
+- **No Mandatory Node.js Runtime**: Runs anywhere without requiring Node.js on your production server.
 
-- **Prerender DOM Activation**: `activate(App, "#app")` attaches behavior directly to existing pre-rendered HTML without Virtual DOM tree diffing.
+- **No Mandatory Bundler**: Serve raw files without Webpack, Vite, Rollup, or Parcel.
 
-- **Optional Zero-Dependency PWA**: Service worker registration, update handling, and disposal management.
+- **Native Browser APIs Whenever Practical**: Leverage native `<template>`, `Comment` markers, `document.querySelector`, and `CustomEvent`.
 
-- **Zero Virtual DOM**: Real DOM nodes created once. Signal updates mutate target DOM nodes directly.
+- **Predictable Lifecycle and Cleanup**: Automatic disposal of event listeners, effect subscriptions, and DOM subtrees (`onMount`, `onDestroy`, `dispose()`).
 
-- **Component Runs Once**: Routine state changes do **not** re-execute component functions (`executions === 1`).
+- **Backend/Server Agnostic**: Serve static files from Nginx, Apache, Caddy, Go, Rust, Python, Django, PHP, Spring Boot, or static CDNs.
 
-- **Zero Production Server Requirements**: Serve static `index.html`, `app.js`, `app.css`, `primal.js` from Nginx, Apache, Caddy, Spring Boot, Go, PHP, Django, ASP.NET, or static CDNs.
+- **PWA Optional**: Built-in zero-dependency Service Worker registration and lifecycle management (`setupPwa`).
+
+- **SEO First-Class**: Dynamic head metadata management (`head()`) updating `<title>`, `<meta>`, OpenGraph, and JSON-LD structured data.
+
+- **Control Flow Helper Tags**: Declarative control flow (`<If>`, `<ElseIf>`, `<Else>`, `<Switch>`, `<Case>`, `<Default>`, `<For>`, `<Continue />`, `<Break />`, `<Try>`, `<Catch>`, `<Render>`, `<Async>`, `<Await>`, `<Pending>`).
+
+- **KISS**: Keep It Simple, Stupid. Minimal abstraction, maximum clarity, and raw performance.
 
 ---
 
----
+## 📦 How to Use PrimalJS in Other Projects
 
-## Step-by-Step Project Setup Guide
+### Method 1: Installing via NPM (Node.js & Bundled Projects)
 
-### Method 1: Zero-Build ES Module Setup (Recommended)
-
-1. **Create your project folder & structure**:
+1. **Install PrimalJS in your project**:
    ```bash
-   mkdir my-primal-app
-   cd my-primal-app
-   ```
-
-
-2. **Copy `primal.js` (or install via npm)**:
-   ```bash
-   # Option A: Direct file copy (Zero Node.js dependency)
-   cp /path/to/primaljs/primal.js ./primal.js
-
-   # Option B: npm installation
    npm install primaljs
    ```
 
+2. **Import and use in your application**:
+   ```javascript
+   import {
+       createApp,
+       createRouter,
+       RouteOutlet,
+       html,
+       signal,
+       computed,
+       mount
+   } from "primaljs";
 
-3. **Create `index.html`**:
+   function App() {
+       const count = signal(0);
+       const doubled = computed(() => count.value * 2);
+
+       return html`
+           <main>
+               <h1>Count: ${count} (Doubled: ${doubled})</h1>
+               <button onclick=${() => count.value++}>Increment</button>
+           </main>
+       `;
+   }
+
+   mount(App, "#app");
+   ```
+
+---
+
+### Method 2: Direct ES Module Import (Zero Build / No Node.js Required)
+
+1. **Copy `primal.js` into your static asset folder**:
+   ```bash
+   cp /path/to/primaljs/primal.js ./public/js/primal.js
+   ```
+
+2. **Create your `index.html`**:
    ```html
    <!DOCTYPE html>
    <html lang="en">
@@ -79,213 +103,611 @@
        <title>My PrimalJS Application</title>
    </head>
    <body>
-       <!-- Application Mount Target -->
        <div id="app"></div>
-
-       <!-- ES Module Entrypoint -->
        <script type="module" src="./src/main.js"></script>
    </body>
    </html>
    ```
 
-
-4. **Create `src/main.js`**:
+3. **Create your `src/main.js`**:
    ```javascript
-   import {
-       createApp,
-       createRouter,
-       RouteOutlet,
-       html,
-       signal,
-       computed,
-       head,
-       If,
-       For
-   } from "../primal.js";
+   import { html, signal, mount } from "../js/primal.js";
 
-   // 1. Reactive State
-   const count = signal(0);
-   const doubleCount = computed(() => count.value * 2);
+   function Counter() {
+       const count = signal(0);
 
-   // 2. Main Layout & Pages
-   function Home() {
-       head({ title: "Home | PrimalJS App" });
        return html`
            <div>
-               <h2>Home Page</h2>
-               <p>Count: ${count} (Double: ${doubleCount})</p>
+               <h2>Count: ${count}</h2>
                <button onclick=${() => count.value++}>Increment</button>
            </div>
        `;
    }
 
-   function Layout() {
-       return html`
-           <div class="layout">
-               <nav>
-                   <a href="/">Home</a>
-               </nav>
-               <main>
-                   <RouteOutlet />
-               </main>
-           </div>
-       `;
-   }
-
-   // 3. Router Configuration
-   const router = createRouter({
-       routes: [
-           {
-               path: "/",
-               component: Layout,
-               children: [
-                   { path: "", component: Home }
-               ]
-           }
-       ]
-   });
-
-   // 4. Initialize & Mount App
-   const app = createApp({
-       router,
-       dev: true,
-       onError(err) {
-           console.error("[PrimalJS App Error]:", err);
-       }
-   });
-
-   app.mount("#app");
+   mount(Counter, "#app");
    ```
 
-
-5. **Serve & View Locally**:
-   Run any static local web server (no build, bundle, or transpilation step required):
+4. **Serve with any HTTP web server**:
    ```bash
-   # Using Node npx
+   # Python
+   python3 -m http.server 8000
+
+   # Node static server
    npx serve .
 
-   # Or Python HTTP server
-   python3 -m http.server 8000
+   # Or serve directly via Nginx, Apache, or Caddy!
    ```
-   Open `http://localhost:8000` in your browser.
 
 ---
 
-## Quick Start Example
+## 🛠️ Comprehensive Feature & API Guide
 
-## Core API Reference
-
-
-### Reactivity, Batching & Refs
+#### A. `signal()` — State Management (Shopping Cart Quantity)
 ```javascript
-import { signal, computed, effect, batch, untrack, ref } from "./primal.js";
+import { signal, html } from "primaljs";
 
-const count = signal(0);
-const multiplier = signal(2);
+// Create a reactive state holder
+const quantity = signal(1);
 
-const doubled = computed(() => count.value * multiplier.value);
+function CartControls() {
+    return html`
+        <div class="cart-controls">
+            <button onclick=${() => quantity.value--}>-</button>
+            <span>Quantity: ${quantity}</span>
+            <button onclick=${() => quantity.value++}>+</button>
+        </div>
+    `;
+}
+```
 
-batch(() => {
-    count.value = 5;
-    multiplier.value = 3;
+#### B. `computed()` — Derived State (E-Commerce Order Subtotal & Tax)
+```javascript
+import { signal, computed, html } from "primaljs";
+
+const itemPrice = signal(49.99);
+const quantity = signal(2);
+const taxRate = signal(0.08); // 8% tax
+
+// Computed value recalculates automatically when itemPrice, quantity, or taxRate changes
+const orderTotal = computed(() => {
+    const subtotal = itemPrice.value * quantity.value;
+    const total = subtotal * (1 + taxRate.value);
+    return total.toFixed(2);
 });
 
-const isPositive = untrack(() => count.value > 0);
-
-const inputRef = ref();
-// In template: <input ref=${inputRef}>
-// After mount: inputRef.current.focus()
+function OrderSummary() {
+    return html`
+        <div class="summary">
+            <p>Total: <strong>\$${orderTotal}</strong></p>
+        </div>
+    `;
+}
 ```
 
-
-### Declarative Control Flow
+#### C. `effect()` — Side Effects & Persistence (Dark Mode LocalStorage Sync)
 ```javascript
-import { html, signal, If, For, Switch, Try, Render, Async, Await, Pending, Catch } from "./primal.js";
+import { signal, effect } from "primaljs";
 
-// Conditional
-html`<If when=${loggedIn}><Dashboard /><Else><Login /></Else></If>`
+const theme = signal(localStorage.getItem("user_theme") || "dark");
 
-// Keyed Loop
-html`<For each=${users} key=${u => u.id}>${u => html`<UserCard user=${u} />`}</For>`
+// Synchronizes state to document.body and localStorage whenever theme.value changes
+effect(() => {
+    localStorage.setItem("user_theme", theme.value);
+    document.body.className = `theme-${theme.value}`;
+});
+```
 
-// Dynamic Component Switcher
-html`<Render component=${activePage} />`
+#### D. `batch()` — Multi-Field Atomic Updates (Form Reset)
+```javascript
+import { signal, batch } from "primaljs";
 
-// Async Data Awaiter
+const username = signal("Lemuel");
+const email = signal("lem@example.com");
+const role = signal("admin");
+
+function resetForm() {
+    // Groups multiple signal writes into a single subscriber notification pass
+    batch(() => {
+        username.value = "";
+        email.value = "";
+        role.value = "user";
+    });
+}
+```
+
+#### E. `untrack()` — Silent Reading Without Dependency Subscription (Search Analytics)
+```javascript
+import { signal, computed, untrack } from "primaljs";
+
+const searchQuery = signal("");
+const currentCategory = signal("electronics");
+
+// Re-evaluates when searchQuery changes, but reads currentCategory silently without subscribing to category mutations
+const filteredProducts = computed(() => {
+    const query = searchQuery.value.toLowerCase().trim();
+    const category = untrack(() => currentCategory.value);
+    return products.filter(p => p.category === category && p.name.toLowerCase().includes(query));
+});
+```
+
+#### F. `ref()` — Direct DOM Element Control (Auto-Focus Search Input)
+```javascript
+import { html, ref, onMount } from "primaljs";
+
+function SearchModal() {
+    const inputRef = ref();
+
+    onMount(() => {
+        // Access raw HTMLInputElement node directly after component mounts
+        if (inputRef.current) {
+            inputRef.current.focus();
+        }
+    });
+
+    return html`
+        <div class="modal">
+            <input ref=${inputRef} type="text" placeholder="Search..." />
+        </div>
+    `;
+}
+```
+
+### 2. Declarative Control Flow Helpers
+```javascript
+import { html, signal, If, For, Switch, Case, Default, Try, Catch, Await, Pending, Render } from "primaljs";
+
+// Declarative Conditionals (<If>, <ElseIf>, <Else>)
+const userRole = signal("admin");
+const isPending = signal(false);
+
 html`
-    <Await promise=${({ signal }) => fetchUser(id, { signal })}>
-        ${user => html`<UserCard user=${user} />`}
-        <Pending><p>Loading...</p></Pending>
-        <Catch>${(err, retry) => html`<button onclick=${retry}>Retry</button>`}</Catch>
+    <If when=${() => isPending.value}>
+        <div class="spinner">Authenticating user...</div>
+        <ElseIf when=${() => userRole.value === "admin"}>
+            <AdminPanel />
+        </ElseIf>
+        <ElseIf when=${() => userRole.value === "editor"}>
+            <EditorPanel />
+        </ElseIf>
+        <Else>
+            <GuestPanel />
+        </Else>
+    </If>
+`
+
+#### 💡 Why `<If>` / `<ElseIf>` / `<Else>` is Important in PrimalJS:
+- **Reactive Branch Swapping Without Parent Re-renders**: Evaluates condition functions (`when=${...}`) reactively and swaps real DOM node ranges directly without re-executing the enclosing parent component function.
+- **Automatic Lifecycle Cleanup**: When active branch switches, PrimalJS automatically disposes of unmounted branch contexts (`onDestroy` hooks, Signal effects, and event listeners).
+
+// Keyed List Iteration (<For>, <Continue />, <Break />, <Else>)
+const users = signal([
+    { id: 101, name: "Lemuel", active: true, sysAdmin: false },
+    { id: 102, name: "Sarah", active: true, sysAdmin: true },
+    { id: 103, name: "Marcus", active: false, sysAdmin: false }
+]);
+
+html`
+    <For each=${users} key=${u => u.id}>
+        ${(user, index) => html`
+            <!-- Skip rendering inactive users -->
+            <Continue when=${() => !user.active} />
+
+            <!-- Stop list iteration if sysAdmin found -->
+            <Break when=${() => user.sysAdmin} />
+
+            <div class="user-card">
+                <span>#${index() + 1}: ${user.name}</span>
+            </div>
+        `}
+        <Else>
+            <p class="empty-msg">No active users available.</p>
+        </Else>
+    </For>
+`
+
+#### 💡 Why `<For>` is Important in PrimalJS:
+- **Keyed DOM Identity Preservation**: Re-orders, inserts, or removes only altered item DOM nodes when the array mutates, keeping unchanged item DOM node instances intact.
+- **Declarative Skip & Early Termination (`<Continue />` & `<Break />`)**: Controls iteration declaratively within template subtrees without manual `.filter()` array transformations.
+- **Empty Collection Fallback (`<Else>`)**: Renders fallback DOM content automatically when the collection is empty (`length === 0`), `null`, or `undefined`.
+- **Automatic Item Context Teardown**: Disposes of unmounted item contexts (`onDestroy` lifecycle hooks, event listeners, and Signals) when items are removed from the array.
+
+// Branch Matching (<Switch>, <Case>, <Default>)
+const status = signal("in_progress");
+
+html`
+    <Switch value=${status}>
+        <Case value="completed">
+            <span class="badge badge-success">✓ Completed</span>
+        </Case>
+        <Case value=${["in_progress", "pending"]}>
+            <span class="badge badge-warning">⏳ Processing...</span>
+        </Case>
+        <Case value=${v => typeof v === "number" && v > 100}>
+            <span class="badge badge-info">High Priority (#${status})</span>
+        </Case>
+        <Default>
+            <span class="badge badge-secondary">Unknown Status</span>
+        </Default>
+    </Switch>
+`
+
+#### 💡 Why `<Switch>` is Important in PrimalJS:
+- **First-Match-Wins & No Fallthrough**: Unlike JavaScript `switch` statements, `<Switch>` uses clean first-match-wins order with zero risk of fallthrough errors and no `break` statements required.
+- **Flexible Value & Predicate Matching**: Supports plain values, reactive Signals, arrays of values (`value=${["a", "b"]}`), and predicate functions (`value=${v => v > 10}`).
+- **Zero Parent Component Re-execution**: Updates active DOM branch ranges directly without re-executing the surrounding component function.
+
+// Declarative Asynchronous Controls (<Async> & <Await>)
+const userId = signal(1);
+
+const fetchUserData = (id, { signal }) => {
+    return fetch(`/api/users/${id}`, { signal }).then(res => res.json());
+};
+
+html`
+    <!-- <Async> automatically re-triggers when reactive Signals inside task change -->
+    <Async task=${({ signal }) => fetchUserData(userId.value, { signal })}>
+        ${user => html`
+            <div class="profile-card">
+                <h3>${user.name}</h3>
+                <p>Email: ${user.email}</p>
+            </div>
+        `}
+        <Pending>
+            <div class="loading-state">Fetching user data...</div>
+        </Pending>
+        <Catch>
+            ${(err, retry) => html`
+                <div class="error-state">
+                    <p>Error: ${err.message}</p>
+                    <button onclick=${retry}>Retry Request</button>
+                </div>
+            `}
+        </Catch>
+    </Async>
+`
+
+#### 💡 Why `<Async>` & `<Await>` are Important in PrimalJS:
+- **Suspense-Like Async Declaratives**: Renders `<Pending>` placeholder UI during Promise resolution without blocking surrounding layout or re-executing parent component functions (`executions === 1`).
+- **Reactive Task Re-triggering**: `<Async task=${...}>` tracks reactive Signals used in task factories and automatically re-executes when dependencies update.
+- **Automatic Request Abort Cancellation (`{ signal }`)**: Supplies an `AbortSignal` to abort stale in-flight fetch requests when Signal state changes or components unmount.
+- **Built-in Error Recovery (`(err, retry)`)**: `<Catch>` provides a `retry` callback to re-trigger failed requests seamlessly.
+
+// Single Promise Resolution (<Await>)
+const analyticsPromise = fetch("/api/analytics").then(res => res.json());
+
+html`
+    <!-- <Await> resolves a single Promise instance or Promise-returning function -->
+    <Await promise=${analyticsPromise}>
+        ${data => html`
+            <div class="stats-card">
+                <h3>Total Visits: ${data.visits}</h3>
+                <p>Conversions: ${data.conversions}</p>
+            </div>
+        `}
+        <Pending>
+            <div class="spinner">Loading analytics...</div>
+        </Pending>
+        <Catch>
+            ${(err, retry) => html`
+                <div>
+                    <p>Failed: ${err.message}</p>
+                    <button onclick=${retry}>Retry Request</button>
+                </div>
+            `}
+        </Catch>
     </Await>
 `
-```
 
+#### 💡 Difference Between `<Async>` and `<Await>` in PrimalJS:
+- **`<Async task=${({ signal }) => ...}>`**: Takes a **task factory function**. Automatically re-executes whenever reactive Signals referenced inside the task factory mutate.
+- **`<Await promise=${promise}>`**: Takes a **direct Promise instance** (or function). Resolves a single Promise without auto-tracking outer Signal changes.
 
-### Router & Nested Layouts
+// Dynamic Component Switcher (<Render>)
+const activeTab = signal(OverviewTab);
+
+html`
+    <div class="tab-buttons">
+        <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
+        <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
+    </div>
+
+    <Render component=${activeTab} props=${{ user }} />
+`
+// Declarative Error Boundaries (<Try>, <Catch>)
+const hasError = signal(false);
+
+function FragileComponent() {
+    if (hasError.value) {
+        throw new Error("Failed to render widget content!");
+    }
+    return html`<div class="widget">Widget Content Loaded</div>`;
+}
+
+html`
+    <Try>
+        <FragileComponent />
+        <Catch>
+            ${(err, reset) => html`
+                <div class="error-box">
+                    <p>⚠️ Exception: ${err.message}</p>
+                    <button onclick=${() => {
+                        hasError.value = false;
+                        reset(); // Resets boundary and remounts protected component
+                    }}>
+                        Reset Component
+                    </button>
+                </div>
+            `}
+        </Catch>
+    </Try>
+`
+
+#### 💡 Why `<Try>` / `<Catch>` is Important in PrimalJS:
+- **Prevents Full-Application Crashes**: Wraps render errors, lifecycle `onMount` failures, and reactive Signal compute exceptions inside protective DOM boundaries.
+- **Graceful Recovery (`reset()`)**: The `<Catch>` callback receives `(err, reset)`, allowing users to recover state and remount subtrees cleanly without page reloads.
+- **Hierarchical Error Propagation**: Nearest nested `<Try>` catches errors first. Uncaught errors escalate up to parent `<Try>` boundaries or `createApp({ onError })`.
+- **Partial Teardown Safety**: Immediately cleans up partially rendered DOM nodes, event listeners, and Signal subscriptions if an exception fires mid-mount.
+
+---
+
+### 3. Client-Side SPA Router & Layouts (`createRouter`, `<RouteOutlet>`)
+
+Here is a complete, real-life Single Page Application router example featuring nested layouts, dynamic route parameters (`/users/:id`), route guards (`beforeEnter`), programmatic navigation (`navigate()`), and dynamic SEO head metadata:
+
 ```javascript
-import { createApp, createRouter, RouteOutlet, head } from "./primal.js";
+import {
+    createApp,
+    createRouter,
+    RouteOutlet,
+    useRoute,
+    navigate,
+    head,
+    html,
+    signal,
+    register
+} from "primaljs";
 
-function MainLayout() {
+// 1. Reactive Auth State for Route Guard
+const isAuthenticated = signal(false);
+
+// 2. Route Guard Function (Redirects unauthenticated users to /login)
+function authGuard(to) {
+    if (!isAuthenticated.value) {
+        console.warn("Unauthorized access to:", to.path);
+        return "/login"; // Redirect path
+    }
+    return true; // Proceed to route
+}
+
+// 3. Main Persistent Layout (Keeps layout DOM untouched across child page transitions)
+function AppLayout() {
     return html`
-        <div id="layout">
-            <nav><a href="/dashboard">Dashboard</a></nav>
-            <main><RouteOutlet /></main>
+        <div class="app-layout">
+            <header class="navbar">
+                <nav>
+                    <a href="/">Dashboard</a>
+                    <a href="/users/101">User Profile (#101)</a>
+                    <a href="/settings">Settings (Protected)</a>
+                </nav>
+            </header>
+            <main class="page-content">
+                <!-- <RouteOutlet /> acts as the placeholder for active child route components -->
+                <RouteOutlet />
+            </main>
         </div>
     `;
 }
 
+// 4. Page Components
+function DashboardPage() {
+    head({
+        title: "Dashboard | PrimalJS App",
+        meta: [{ name: "description", content: "Overview dashboard analytics." }]
+    });
+
+    return html`<h2>Dashboard Overview</h2>`;
+}
+
+function UserProfilePage() {
+    const route = useRoute(); // Access dynamic route params reactively (:id)
+
+    head({
+        title: `User #${route.params.id} Profile`,
+        meta: [{ name: "description", content: `User profile page for ID ${route.params.id}` }]
+    });
+
+    return html`
+        <div class="profile-page">
+            <h2>User Profile</h2>
+            <p>User ID: <strong>${() => route.params.id}</strong></p>
+            <button onclick=${() => navigate("/")}>Return to Dashboard</button>
+        </div>
+    `;
+}
+
+function SettingsPage() {
+    head({ title: "Settings | PrimalJS App" });
+    return html`<h2>Account Settings (Protected Area)</h2>`;
+}
+
+function LoginPage() {
+    head({ title: "Login | PrimalJS App" });
+
+    function handleLogin() {
+        isAuthenticated.value = true;
+        navigate("/settings"); // Navigate programmatically after login
+    }
+
+    return html`
+        <div class="login-page">
+            <h2>Please Log In</h2>
+            <button onclick=${handleLogin}>Log In as Admin</button>
+        </div>
+    `;
+}
+
+// Register custom components used in tagged templates
+register(AppLayout, DashboardPage, UserProfilePage, SettingsPage, LoginPage, RouteOutlet);
+
+// 5. Create Router Configuration
 const router = createRouter({
     routes: [
         {
-            path: "/dashboard",
-            component: MainLayout,
+            path: "/",
+            component: AppLayout,
             children: [
-                { path: "", component: DashboardHome },
-                { path: "users", component: UsersPage, beforeEnter: (route) => checkAuth(route) }
+                { path: "", component: DashboardPage },
+                { path: "users/:id", component: UserProfilePage },
+                { path: "settings", component: SettingsPage, beforeEnter: authGuard },
+                { path: "login", component: LoginPage }
             ]
         }
     ]
 });
 
+// 6. Mount Application
 const app = createApp({
     router,
     dev: true,
-    onError(err, ctx) {
-        console.error("Global Error:", err, ctx);
+    onError(err) {
+        console.error("Global Router Error:", err);
     }
 });
 
 app.mount("#app");
 ```
 
+#### 💡 Key Router Capabilities & Architectural Benefits:
+- **Layout Preservation**: Navigating child routes (`/` -> `/users/101`) swaps only the `<RouteOutlet />` content without re-executing or destroying the parent `<AppLayout />` DOM instance.
+- **Dynamic Route Params (`useRoute()`)**: Extract URL parameters (like `:id`) reactively.
+- **Route Guards & Redirects (`beforeEnter`)**: Protect routes by returning a boolean or string redirect path.
+- **Integrated SEO (`head()`)**: Dynamically updates document `<title>`, `<meta>`, canonical links, and JSON-LD structured data on route transitions.
+
 ---
 
+### 4. Zero-Dependency PWA Management (`setupPwa`, `unregisterServiceWorkers`)
 
-## Architecture Guarantees & Verification
+PrimalJS provides built-in PWA service worker registration and cleanup management without third-party libraries:
 
-PrimalJS includes mandatory unit tests verifying fundamental architectural guarantees:
+```javascript
+import { setupPwa, unregisterServiceWorkers } from "primaljs";
 
-1. **DOM Identity Test**: Verifies `headingBefore === headingAfter` when signals update or boundaries trigger.
+// --- Enable PWA Support & Worker Registration ---
+setupPwa({
+    swPath: "./sw.js",
+    updateStrategy: "prompt",
+    onUpdateAvailable() {
+        if (confirm("A new update is available. Reload app to apply?")) {
+            window.location.reload();
+        }
+    }
+});
 
-2. **Component Execution Test**: Verifies component function executes exactly once (`executions === 1`) on mount and never re-executes on state changes, error boundary resets, or async state transitions.
+// --- Disable PWA & Unregister Workers / Clear Caches ---
+function disablePwa() {
+    // Unregisters service worker script and deletes associated 'primal-' cache stores safely
+    unregisterServiceWorkers("./sw.js");
+}
+```
 
-3. **Declarative Control-Flow & Integration Test Suites**:
-   - `test/batch_untrack.test.js` (`batch()`, `untrack()`)
-   - `test/root_disposal.test.js` (`app.dispose()`, idempotency, re-mounting)
-   - `test/svg_custom_elements.test.js` (SVG namespace, `viewBox`, Web Components)
-   - `test/router_nested.test.js` (Nested routes, `<RouteOutlet>`, layout preservation, guards)
-   - `test/diagnostics_global_error.test.js` (`PrimalJSError`, `createApp({ onError })`)
-   - `test/e2e.test.js` (Puppeteer real browser suite)
+#### 💡 PWA Management Capabilities:
+- **Zero Runtime Dependencies**: Native Service Worker registration and event listeners.
+- **Update Detection (`updateStrategy: "prompt"`)**: Notifies application when an updated Service Worker is waiting (`onUpdateAvailable`).
+- **Safe Teardown (`unregisterServiceWorkers`)**: Safely unregisters PrimalJS service workers and purges `primal-` cache entries without touching unrelated third-party workers.
 
-Run automated test suite:
+---
+
+### 5. SEO Safety & Dynamic Head Metadata (`head()`, `activate()`)
+
+PrimalJS is engineered to be **100% SEO safe** out of the box for both search engines (Googlebot, Bingbot) and social media crawlers (OpenGraph, Twitter Cards).
+
+#### A. Dynamic Head Metadata (`head()`) Sample Code:
+
+```javascript
+import { html, head, signal } from "primaljs";
+
+function ProductDetail({ product }) {
+    // Dynamically manages document title, meta tags, OpenGraph, canonical links, and JSON-LD
+    head({
+        title: `${product.name} - \$${product.price} | My Store`,
+        meta: [
+            { name: "description", content: product.description },
+            { property: "og:title", content: product.name },
+            { property: "og:image", content: product.imageUrl },
+            { name: "twitter:card", content: "summary_large_image" }
+        ],
+        link: [
+            { rel: "canonical", href: `https://example.com/products/${product.id}` }
+        ],
+        script: [
+            {
+                type: "application/ld+json",
+                content: JSON.stringify({
+                    "@context": "https://schema.org/",
+                    "@type": "Product",
+                    "name": product.name,
+                    "image": [product.imageUrl],
+                    "description": product.description,
+                    "offers": {
+                        "@type": "Offer",
+                        "price": product.price,
+                        "priceCurrency": "USD"
+                    }
+                })
+            }
+        ]
+    });
+
+    return html`
+        <article class="product-card">
+            <h1>${product.name}</h1>
+            <p>${product.description}</p>
+            <span class="price">\$${product.price}</span>
+        </article>
+    `;
+}
+```
+
+#### B. Pre-rendered HTML Activation (`activate()`) Sample Code:
+
+```javascript
+import { activate } from "primaljs";
+
+// Server serves static pre-rendered HTML containing comment markers (e.g., <!--primal-ph-0-->)
+// Client browser executes activate() to attach Signals and event listeners WITHOUT clearing innerHTML
+activate(ProductDetail, "#app");
+```
+
+#### 💡 Why PrimalJS is 100% SEO Safe:
+
+1. **True Pre-Render DOM Activation (`activate()`)**:
+   Search engine crawlers receive fully formed, semantic HTML directly in the initial HTTP response. When client JavaScript executes `activate(App, "#app")`, PrimalJS locates deterministic markers (`<!--primal-ph-N-->`) and attaches behavior to the **existing DOM nodes** without clearing `innerHTML` or causing layout flashes.
+
+2. **First-Class Dynamic Head Management (`head()`)**:
+   Single Page Applications often suffer from stale metadata. `head()` dynamically updates document `<title>`, meta descriptions, OpenGraph cards, canonical links, and JSON-LD structured data on route transitions, automatically purging old route metadata.
+
+3. **Pure Semantic HTML5 Output**:
+   PrimalJS generates pure HTML5 element trees directly in the DOM without proprietary Virtual DOM wrapper elements, synthetic event wrappers, or custom non-standard markup.
+
+---
+
+## 🧪 Architecture & Verification
+
+PrimalJS includes a comprehensive automated test suite verifying strict architectural guarantees:
+
+- **Component Execution Count**: Components execute **exactly once** (`executions === 1`) on mount and never re-execute on Signal changes.
+
+- **DOM Identity Preservation**: Target DOM element instances remain untouched when state mutates.
+
+- **Root Disposal**: `mount()` returns `{ dispose() }` for idempotent teardown of DOM nodes, event listeners, and reactive subscriptions.
+
+Run the test suite:
 ```bash
 npm test
 ```
 
 ---
 
+## 📜 License
 
-## License
-
-MIT
+MIT License
