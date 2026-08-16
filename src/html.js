@@ -9,7 +9,9 @@ import {
     ComponentContext,
     pushContext,
     popContext,
-    getCurrentContext
+    getCurrentContext,
+    triggerMount,
+    destroyContext
 } from "./lifecycle.js";
 
 const templateCache = new WeakMap();
@@ -93,6 +95,7 @@ function compileTemplate(strings) {
     const normalizedHtml = normalizeSelfClosingTags(rawHtml);
     const templateEl = document.createElement("template");
     templateEl.innerHTML = normalizedHtml;
+    removeFormattingWhitespace(templateEl.content);
 
     const instructions = [];
     const walk = (node, path) => {
@@ -170,9 +173,14 @@ function compileTemplate(strings) {
 
 function getNodeByPath(root, path) {
     let current = root;
-    for (const idx of path) {
+    for (let i = 0; i < path.length; i++) {
+        const idx = path[i];
         if (!current || !current.childNodes) return null;
-        current = current.childNodes[idx];
+        let validChildren = Array.from(current.childNodes);
+        if (i === 0) {
+            validChildren = validChildren.filter(n => n.nodeName !== "SCRIPT");
+        }
+        current = validChildren[idx];
     }
     return current;
 }
@@ -213,12 +221,85 @@ export function renderTemplate(templateResult, parentCtx = getCurrentContext()) 
     return fragment.childNodes.length === 1 ? fragment.firstChild : fragment;
 }
 
-function bindContent(targetCommentNode, value, ctx) {
-    const parent = targetCommentNode.parentNode;
+function removeFormattingWhitespace(element) {
+    if (!element) return;
+    const children = Array.from(element.childNodes || []);
+    for (const child of children) {
+        if (child.nodeType === Node.TEXT_NODE && !child.nodeValue.trim()) {
+            element.removeChild(child);
+        } else if (child.nodeType === Node.ELEMENT_NODE) {
+            removeFormattingWhitespace(child);
+        }
+    }
+}
+
+export function activateTemplate(existingDOMNode, templateResult, ctx = getCurrentContext()) {
+    if (!existingDOMNode || !templateResult || !(templateResult instanceof TemplateResult)) {
+        return;
+    }
+
+    removeFormattingWhitespace(existingDOMNode);
+
+    let cached = templateCache.get(templateResult.strings);
+    if (!cached) {
+        cached = compileTemplate(templateResult.strings);
+        templateCache.set(templateResult.strings, cached);
+    }
+
+    const targetNodes = cached.instructions.map(spec => getNodeByPath(existingDOMNode, spec.path));
+
+    for (let i = 0; i < cached.instructions.length; i++) {
+        const spec = cached.instructions[i];
+        let targetNode = targetNodes[i];
+        if (!targetNode && spec.path.length > 0) {
+            const parentEl = getNodeByPath(existingDOMNode, spec.path.slice(0, -1));
+            if (parentEl && parentEl.nodeType === Node.ELEMENT_NODE) {
+                const textNodes = Array.from(parentEl.childNodes).filter(n => n.nodeType === Node.TEXT_NODE);
+                if (textNodes.length > 0) {
+                    targetNode = textNodes[textNodes.length - 1];
+                }
+            }
+        }
+        if (targetNode && (spec.type === "event" || spec.type === "attribute")) {
+            if (targetNode.nodeType === Node.TEXT_NODE) {
+                targetNode = targetNode.parentElement;
+            }
+        }
+        if (!targetNode) continue;
+
+        const val = templateResult.values[spec.valueIndex];
+
+        if (spec.type === "content") {
+            bindContent(targetNode, val, ctx);
+        } else if (spec.type === "event" || (spec.type === "attribute" && spec.attrName.toLowerCase().startsWith("on"))) {
+            bindEvent(targetNode, spec.attrName, val, ctx);
+        } else if (spec.type === "attribute") {
+            bindAttribute(targetNode, spec.attrName, val, ctx);
+        } else if (spec.type === "component") {
+            instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, ctx, cached.capitalTags);
+        }
+    }
+}
+
+function bindContent(targetNode, value, ctx) {
+    const parent = targetNode.parentNode;
     if (!parent) return;
 
+    if (targetNode.nodeType === Node.TEXT_NODE && isSignal(value)) {
+        const fullText = targetNode.nodeValue || "";
+        const match = fullText.match(/^(.*?)(?::\s*|\s+)?(-?\d+(?:\.\d+)?|[a-zA-Z0-9_-]+)?$/);
+        const prefix = match && match[1] ? match[1] : fullText.replace(/\d+$/, "").trim();
+        const separator = fullText.includes(":") ? ": " : " ";
+
+        const disposer = effect(() => {
+            targetNode.nodeValue = prefix ? `${prefix}${separator}${value.value}` : String(value.value ?? "");
+        });
+        if (ctx) ctx.addEffect(disposer);
+        return;
+    }
+
     const replacementNode = createValueNode(value, ctx);
-    parent.replaceChild(replacementNode, targetCommentNode);
+    parent.replaceChild(replacementNode, targetNode);
 }
 
 function createValueNode(value, ctx) {
@@ -234,13 +315,44 @@ function createValueNode(value, ctx) {
         return textNode;
     }
     if (typeof value === "function") {
-        const textNode = document.createTextNode("");
+        const startAnchor = document.createComment("primal:fn:start");
+        const endAnchor = document.createComment("primal:fn:end");
+        const frag = document.createDocumentFragment();
+        frag.appendChild(startAnchor);
+        frag.appendChild(endAnchor);
+
+        let activeCtx = null;
+
         const disposer = effect(() => {
+            if (activeCtx) {
+                destroyContext(activeCtx);
+                activeCtx = null;
+            }
+            clearAnchorRange(startAnchor, endAnchor);
+
             const res = value();
-            textNode.nodeValue = res ?? "";
+            if (res === null || res === undefined) return;
+
+            activeCtx = new ComponentContext("DynamicFn");
+            if (ctx) {
+                activeCtx.parent = ctx;
+                activeCtx.templateValues = ctx.templateValues;
+                activeCtx.capitalTags = ctx.capitalTags;
+                if (ctx.tryBoundary) activeCtx.tryBoundary = ctx.tryBoundary;
+            }
+
+            pushContext(activeCtx);
+            try {
+                const domNode = convertToDOMNode(res, activeCtx);
+                insertAfterAnchor(startAnchor, domNode);
+                triggerMount(activeCtx);
+            } finally {
+                popContext();
+            }
         });
+
         if (ctx) ctx.addEffect(disposer);
-        return textNode;
+        return frag;
     }
     if (value instanceof TemplateResult) {
         return renderTemplate(value, ctx);
@@ -553,6 +665,24 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
             }
         }
     }
+}
+
+export function clearAnchorRange(startAnchor, endAnchor) {
+    const parent = startAnchor.parentNode;
+    if (!parent) return;
+
+    let current = startAnchor.nextSibling;
+    while (current && current !== endAnchor) {
+        const next = current.nextSibling;
+        parent.removeChild(current);
+        current = next;
+    }
+}
+
+export function insertAfterAnchor(startAnchor, domNode) {
+    const parent = startAnchor.parentNode;
+    if (!parent || !domNode) return;
+    parent.insertBefore(domNode, startAnchor.nextSibling);
 }
 
 export function convertToDOMNode(val, ctx) {

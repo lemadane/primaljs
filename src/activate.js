@@ -5,6 +5,7 @@
 
 import { ComponentContext, pushContext, popContext, triggerMount, destroyContext } from "./lifecycle.js";
 import { unmount } from "./mount.js";
+import { activateTemplate, TemplateResult } from "./html.js";
 
 export function activate(App, target, initialState = {}) {
     if (typeof document === "undefined") return null;
@@ -42,13 +43,18 @@ export function activate(App, target, initialState = {}) {
     const rootCtx = new ComponentContext(App.name || "Root");
     targetEl._primalCtx = rootCtx;
 
+    let compResult;
     pushContext(rootCtx);
     try {
         if (typeof App === "function") {
-            App(serializedState);
+            compResult = App(serializedState);
         }
     } finally {
         popContext();
+    }
+
+    if (compResult && compResult instanceof TemplateResult) {
+        activateTemplate(targetEl, compResult, rootCtx);
     }
 
     // Trigger onMount hooks recursively on activated DOM context

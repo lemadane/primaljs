@@ -1,6 +1,6 @@
 {
   "name": "primaljs",
-  "version": "0.1.0-alpha.1",
+  "version": "0.2.0-beta",
   "description": "Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real DOM Updates, No Virtual DOM, No Compiler.",
   "type": "module",
   "main": "src/index.js",
