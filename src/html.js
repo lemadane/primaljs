@@ -295,7 +295,7 @@ function bindContent(targetNode, value, ctx) {
     const parent = targetNode.parentNode;
     if (!parent) return;
 
-    if (value && (value.__isContinue || value.__isBreak || value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isCatch || value.__isPending)) {
+    if (value && (value.__isContinue || value.__isBreak || value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isCatch || value.__isPending || value.__isBriefly || value.__isFailed)) {
         const comment = document.createComment("primal:descriptor");
         comment._primalDescriptor = value;
         parent.replaceChild(comment, targetNode);
@@ -320,7 +320,7 @@ function bindContent(targetNode, value, ctx) {
 }
 
 function createValueNode(value, ctx) {
-    if (value && (value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isContinue || value.__isBreak || value.__isCatch || value.__isPending)) {
+    if (value && (value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isContinue || value.__isBreak || value.__isCatch || value.__isPending || value.__isBriefly || value.__isFailed)) {
         return value;
     }
     if (isSignal(value)) {
@@ -637,7 +637,7 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
         popContext();
     }
 
-    if (compResult && (compResult.__isElse || compResult.__isElseIf || compResult.__isCase || compResult.__isDefault || compResult.__isContinue || compResult.__isBreak || compResult.__isCatch || compResult.__isPending)) {
+    if (compResult && (compResult.__isElse || compResult.__isElseIf || compResult.__isCase || compResult.__isDefault || compResult.__isContinue || compResult.__isBreak || compResult.__isCatch || compResult.__isPending || compResult.__isBriefly || compResult.__isFailed)) {
         if (parent) {
             const descriptorComment = document.createComment(`primal:${componentFn.name.toLowerCase()}`);
             descriptorComment._primalDescriptor = compResult;

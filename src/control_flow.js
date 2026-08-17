@@ -140,12 +140,34 @@ export function Break(props) {
  */
 export function Pending(props) {
     const ctx = getCurrentContext();
-    const isInsideAwait = ctx && (ctx.name === "Await" || (ctx.parent && ctx.parent.name === "Await"));
-    const isInsideAsync = ctx && (ctx.name === "Async" || (ctx.parent && ctx.parent.name === "Async"));
-    if (!isInsideAwait && !isInsideAsync && (!props || !props.__isControlFlowChild)) {
+    const isInsideOwner = ctx && (
+        ctx.name === "Wait" || ctx.name === "Delay" || ctx.name === "Await" || ctx.name === "Async" ||
+        (ctx.parent && (ctx.parent.name === "Wait" || ctx.parent.name === "Delay" || ctx.parent.name === "Await" || ctx.parent.name === "Async"))
+    );
+    if (!isInsideOwner || !props || (!props.__isControlFlowChild && !props.__templateValues && props.children === undefined)) {
         throw new Error("<Pending> must be used within an <Await> or <Async> container.");
     }
     return {
+        __isPending: true,
+        __isBriefly: true,
+        children: props ? props.children : []
+    };
+}
+
+/**
+ * <Briefly> Component helper (Human-first loading fallback)
+ */
+export function Briefly(props) {
+    const ctx = getCurrentContext();
+    const isInsideOwner = ctx && (
+        ctx.name === "Wait" || ctx.name === "Delay" || ctx.name === "Await" || ctx.name === "Async" ||
+        (ctx.parent && (ctx.parent.name === "Wait" || ctx.parent.name === "Delay" || ctx.parent.name === "Await" || ctx.parent.name === "Async"))
+    );
+    if (!isInsideOwner || !props || (!props.__isControlFlowChild && !props.__templateValues && props.children === undefined)) {
+        throw new Error("<Briefly> must be used within a <Wait> or <Delay> container.");
+    }
+    return {
+        __isBriefly: true,
         __isPending: true,
         children: props ? props.children : []
     };
@@ -156,10 +178,11 @@ export function Pending(props) {
  */
 export function Catch(props) {
     const ctx = getCurrentContext();
-    const isInsideTry = ctx && (ctx.name === "Try" || (ctx.parent && ctx.parent.name === "Try"));
-    const isInsideAwait = ctx && (ctx.name === "Await" || (ctx.parent && ctx.parent.name === "Await"));
-    const isInsideAsync = ctx && (ctx.name === "Async" || (ctx.parent && ctx.parent.name === "Async"));
-    if (!isInsideTry && !isInsideAwait && !isInsideAsync && (!props || !props.__isControlFlowChild)) {
+    const isInsideOwner = ctx && (
+        ctx.name === "Try" || ctx.name === "Wait" || ctx.name === "Delay" || ctx.name === "Await" || ctx.name === "Async" ||
+        (ctx.parent && (ctx.parent.name === "Try" || ctx.parent.name === "Wait" || ctx.parent.name === "Delay" || ctx.parent.name === "Await" || ctx.parent.name === "Async"))
+    );
+    if (!isInsideOwner || !props || (!props.__isControlFlowChild && !props.__templateValues && props.children === undefined)) {
         throw new Error("<Catch> must be a direct child of a <Try> container.");
     }
 
@@ -167,6 +190,31 @@ export function Catch(props) {
     let children = props ? props.children : [];
 
     return {
+        __isCatch: true,
+        __isFailed: true,
+        fn: fn,
+        children: children
+    };
+}
+
+/**
+ * <Failed> Component helper (Human-first error fallback)
+ */
+export function Failed(props) {
+    const ctx = getCurrentContext();
+    const isInsideOwner = ctx && (
+        ctx.name === "Try" || ctx.name === "Wait" || ctx.name === "Delay" || ctx.name === "Await" || ctx.name === "Async" ||
+        (ctx.parent && (ctx.parent.name === "Try" || ctx.parent.name === "Wait" || ctx.parent.name === "Delay" || ctx.parent.name === "Await" || ctx.parent.name === "Async"))
+    );
+    if (!isInsideOwner || !props || (!props.__isControlFlowChild && !props.__templateValues && props.children === undefined)) {
+        throw new Error("<Failed> must be a direct child of a <Try>, <Wait>, or <Delay> container.");
+    }
+
+    let fn = typeof (props ? props.children : undefined) === "function" ? props.children : undefined;
+    let children = props ? props.children : [];
+
+    return {
+        __isFailed: true,
         __isCatch: true,
         fn: fn,
         children: children
@@ -576,7 +624,7 @@ function parseAwaitChildren(awaitProps) {
         const isElement = child && child.nodeType === Node.ELEMENT_NODE;
         const tagName = isElement ? child.nodeName.toUpperCase() : "";
 
-        if (isElement && (tagName === "PENDING" || tagName === "CATCH")) {
+        if (isElement && (tagName === "PENDING" || tagName === "BRIEFLY" || tagName === "CATCH" || tagName === "FAILED")) {
             const props = { __isControlFlowChild: true };
             for (let i = 0; i < child.attributes.length; i++) {
                 const attr = child.attributes[i];
@@ -591,7 +639,7 @@ function parseAwaitChildren(awaitProps) {
             const childNodes = Array.from(child.childNodes || []);
 
             let catchFn = null;
-            if (tagName === "CATCH" && childNodes.length === 1 && childNodes[0].nodeType === Node.COMMENT_NODE) {
+            if ((tagName === "CATCH" || tagName === "FAILED") && childNodes.length === 1 && childNodes[0].nodeType === Node.COMMENT_NODE) {
                 const text = childNodes[0].nodeValue ? childNodes[0].nodeValue.trim() : "";
                 if (text.startsWith("primal-ph-")) {
                     const idx = parseInt(text.replace("primal-ph-", ""), 10);
@@ -616,14 +664,14 @@ function parseAwaitChildren(awaitProps) {
                 props.children = catchFn;
             }
 
-            if (tagName === "PENDING") {
-                descriptor = Pending(props);
+            if (tagName === "PENDING" || tagName === "BRIEFLY") {
+                descriptor = Briefly(props);
             } else {
-                descriptor = Catch(props);
+                descriptor = Failed(props);
             }
         }
 
-        if (descriptor && descriptor.__isPending) {
+        if (descriptor && (descriptor.__isPending || descriptor.__isBriefly)) {
             if (hasPending) {
                 throw new Error("<Await> can only contain a single <Pending> branch.");
             }
@@ -634,7 +682,7 @@ function parseAwaitChildren(awaitProps) {
             pendingBranch = descriptor.children !== undefined
                 ? (Array.isArray(descriptor.children) ? descriptor.children : [descriptor.children])
                 : [];
-        } else if (descriptor && descriptor.__isCatch) {
+        } else if (descriptor && (descriptor.__isCatch || descriptor.__isFailed)) {
             if (hasCatch) {
                 throw new Error("<Await> can only contain a single <Catch> branch.");
             }
@@ -684,6 +732,7 @@ function parseAsyncChildren(asyncProps) {
         ? (Array.isArray(asyncProps.children) ? asyncProps.children : [asyncProps.children])
         : [];
 
+    let renderResult = null;
     let pendingBranch = null;
     let catchBranch = null;
     let hasPending = false;
@@ -695,11 +744,20 @@ function parseAsyncChildren(asyncProps) {
             continue;
         }
 
+        const effectiveChild = unwrapPlaceholderValue(child, templateValues);
+        if (typeof effectiveChild === "function") {
+            if (hasPending || hasCatch) {
+                throw new Error("Result renderer function in <Async> must appear before <Pending> and <Catch>.");
+            }
+            renderResult = effectiveChild;
+            continue;
+        }
+
         let descriptor = (child && child._primalDescriptor) ? child._primalDescriptor : child;
         const isElement = child && child.nodeType === Node.ELEMENT_NODE;
         const tagName = isElement ? child.nodeName.toUpperCase() : "";
 
-        if (isElement && (tagName === "PENDING" || tagName === "CATCH")) {
+        if (isElement && (tagName === "PENDING" || tagName === "BRIEFLY" || tagName === "CATCH" || tagName === "FAILED")) {
             const props = { __isControlFlowChild: true };
             for (let i = 0; i < child.attributes.length; i++) {
                 const attr = child.attributes[i];
@@ -714,7 +772,7 @@ function parseAsyncChildren(asyncProps) {
             const childNodes = Array.from(child.childNodes || []);
 
             let catchFn = null;
-            if (tagName === "CATCH" && childNodes.length === 1 && childNodes[0].nodeType === Node.COMMENT_NODE) {
+            if ((tagName === "CATCH" || tagName === "FAILED") && childNodes.length === 1 && childNodes[0].nodeType === Node.COMMENT_NODE) {
                 const text = childNodes[0].nodeValue ? childNodes[0].nodeValue.trim() : "";
                 if (text.startsWith("primal-ph-")) {
                     const idx = parseInt(text.replace("primal-ph-", ""), 10);
@@ -739,14 +797,14 @@ function parseAsyncChildren(asyncProps) {
                 props.children = catchFn;
             }
 
-            if (tagName === "PENDING") {
-                descriptor = Pending(props);
+            if (tagName === "PENDING" || tagName === "BRIEFLY") {
+                descriptor = Briefly(props);
             } else {
-                descriptor = Catch(props);
+                descriptor = Failed(props);
             }
         }
 
-        if (descriptor && descriptor.__isPending) {
+        if (descriptor && (descriptor.__isPending || descriptor.__isBriefly)) {
             if (hasPending) {
                 throw new Error("<Async> can only contain a single <Pending> branch.");
             }
@@ -757,7 +815,7 @@ function parseAsyncChildren(asyncProps) {
             pendingBranch = descriptor.children !== undefined
                 ? (Array.isArray(descriptor.children) ? descriptor.children : [descriptor.children])
                 : [];
-        } else if (descriptor && descriptor.__isCatch) {
+        } else if (descriptor && (descriptor.__isCatch || descriptor.__isFailed)) {
             if (hasCatch) {
                 throw new Error("<Async> can only contain a single <Catch> branch.");
             }
@@ -793,7 +851,7 @@ function parseAsyncChildren(asyncProps) {
         }
     }
 
-    return { nonStructuralChildren, pendingBranch, catchBranch };
+    return { renderResult, nonStructuralChildren, pendingBranch, catchBranch };
 }
 
 function clearAnchorRange(startAnchor, endAnchor) {
@@ -1464,14 +1522,14 @@ export function Try(props) {
 }
 
 /**
- * Declarative <Await> Component
+ * Declarative <Wait> Component (Single Promise Unwrapping)
  */
-export function Await(props) {
+export function Wait(props) {
     const ctx = getCurrentContext();
     const { renderResult, pendingBranch, catchBranch } = parseAwaitChildren(props);
 
-    const startAnchor = document.createComment("primal:await:start");
-    const endAnchor = document.createComment("primal:await:end");
+    const startAnchor = document.createComment("primal:wait:start");
+    const endAnchor = document.createComment("primal:wait:end");
 
     const fragment = document.createDocumentFragment();
     fragment.appendChild(startAnchor);
@@ -1672,14 +1730,14 @@ export function Await(props) {
 }
 
 /**
- * Declarative <Async> Component
+ * Declarative <Delay> Component (Reactive Async Tasks & Component Loading)
  */
-export function Async(props) {
+export function Delay(props) {
     const ctx = getCurrentContext();
-    const { nonStructuralChildren, pendingBranch, catchBranch } = parseAsyncChildren(props);
+    const { renderResult, nonStructuralChildren, pendingBranch, catchBranch } = parseAsyncChildren(props);
 
-    const startAnchor = document.createComment("primal:async:start");
-    const endAnchor = document.createComment("primal:async:end");
+    const startAnchor = document.createComment("primal:delay:start");
+    const endAnchor = document.createComment("primal:delay:end");
 
     const fragment = document.createDocumentFragment();
     fragment.appendChild(startAnchor);
@@ -1735,20 +1793,7 @@ export function Async(props) {
         if (currentOp !== operationId) return;
         clearActiveSubtree();
 
-        const CompFn = typeof ComponentExport === "function"
-            ? ComponentExport
-            : (ComponentExport && ComponentExport.default
-                ? ComponentExport.default
-                : (ComponentExport && typeof ComponentExport === "object"
-                    ? Object.values(ComponentExport).find(v => typeof v === "function")
-                    : null));
-
-        if (!CompFn) {
-            mountRejected(new Error("<Async> loaded module does not export a valid Component function."), currentOp);
-            return;
-        }
-
-        activeSubtreeCtx = new ComponentContext(`AsyncComponent:${CompFn.name || "Component"}`);
+        activeSubtreeCtx = new ComponentContext("AsyncComponent");
         activeSubtreeCtx.templateValues = props.__templateValues || [];
         activeSubtreeCtx.capitalTags = props.__capitalTags || new Set();
         if (ctx && ctx.tryBoundary) activeSubtreeCtx.tryBoundary = ctx.tryBoundary;
@@ -1757,20 +1802,43 @@ export function Async(props) {
             ctx.children.push(activeSubtreeCtx);
         }
 
-        const passProps = { ...props };
-        delete passProps.component;
-        delete passProps.children;
-        if (nonStructuralChildren.length > 0) {
-            passProps.children = nonStructuralChildren.length === 1
-                ? nonStructuralChildren[0]
-                : nonStructuralChildren;
-        }
-
         pushContext(activeSubtreeCtx);
         let compDOM;
         try {
-            const res = CompFn(passProps);
-            compDOM = convertToDOMNode(res, activeSubtreeCtx);
+            if (typeof renderResult === "function") {
+                const res = renderResult(ComponentExport);
+                const nodes = Array.isArray(res) ? res : [res];
+                compDOM = document.createDocumentFragment();
+                for (const c of nodes) {
+                    const domNode = convertToDOMNode(c, activeSubtreeCtx);
+                    if (domNode) compDOM.appendChild(domNode);
+                }
+            } else if (typeof ComponentExport === "function" || (ComponentExport && (ComponentExport.default || typeof ComponentExport === "object"))) {
+                const CompFn = typeof ComponentExport === "function"
+                    ? ComponentExport
+                    : (ComponentExport && ComponentExport.default
+                        ? ComponentExport.default
+                        : (ComponentExport && typeof ComponentExport === "object"
+                            ? Object.values(ComponentExport).find(v => typeof v === "function")
+                            : null));
+                if (CompFn) {
+                    const passProps = { ...props };
+                    delete passProps.component;
+                    delete passProps.task;
+                    delete passProps.children;
+                    if (nonStructuralChildren.length > 0) {
+                        passProps.children = nonStructuralChildren.length === 1
+                            ? nonStructuralChildren[0]
+                            : nonStructuralChildren;
+                    }
+                    const res = CompFn(passProps);
+                    compDOM = convertToDOMNode(res, activeSubtreeCtx);
+                } else {
+                    compDOM = convertToDOMNode(ComponentExport, activeSubtreeCtx);
+                }
+            } else {
+                compDOM = convertToDOMNode(ComponentExport, activeSubtreeCtx);
+            }
         } catch (err) {
             const tryBoundary = activeSubtreeCtx.tryBoundary || (ctx ? ctx.tryBoundary : null);
             if (tryBoundary && typeof tryBoundary.handleError === "function") {
@@ -1846,13 +1914,14 @@ export function Async(props) {
         }
         activeController = typeof AbortController !== "undefined" ? new AbortController() : null;
 
+        const targetProp = (props && props.task !== undefined) ? props.task : (props ? props.component : undefined);
         let compTarget;
-        if (typeof props.component === "function") {
-            compTarget = props.component({ signal: activeController ? activeController.signal : undefined });
-        } else if (isSignal(props.component)) {
-            compTarget = props.component.value;
+        if (typeof targetProp === "function") {
+            compTarget = targetProp({ signal: activeController ? activeController.signal : undefined });
+        } else if (isSignal(targetProp)) {
+            compTarget = targetProp.value;
         } else {
-            compTarget = props.component;
+            compTarget = targetProp;
         }
 
         if (compTarget && typeof compTarget.then === "function") {
@@ -1881,7 +1950,8 @@ export function Async(props) {
         }
     };
 
-    if (isSignal(props.component) || typeof props.component === "function") {
+    const targetProp = (props && props.task !== undefined) ? props.task : (props ? props.component : undefined);
+    if (isSignal(targetProp) || typeof targetProp === "function") {
         const disposer = effect(() => {
             loadAsyncComponent();
         });
@@ -1903,3 +1973,13 @@ export function Async(props) {
 
     return fragment;
 }
+
+// Backward-compatibility aliases
+export function Async(props) {
+    return Delay(props);
+}
+
+export function Await(props) {
+    return Wait(props);
+}
+

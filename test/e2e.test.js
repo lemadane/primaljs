@@ -106,110 +106,194 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await page.close();
     });
 
-    it("runs declarative conditional app (examples/conditional) toggling <If>, <ElseIf>, <Else> DOM ranges in real browser", async () => {
+    it("runs declarative conditional app (examples/conditional) testing <If>, <ElseIf>, <Else>, computed conditions, nested <If>, and empty region in real browser", async () => {
         const page = await browser.newPage();
         await page.goto(`http://localhost:${PORT}/examples/conditional/index.html`, {
             waitUntil: "networkidle0"
         });
 
-        const loadingText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // 1. Initial <If> branch (loading)
+        const loadingText = await page.$eval(".loading-msg", el => el.textContent.trim());
         assert.ok(loadingText.includes("Loading data from server"));
 
-        const buttons = await page.$$(".btn-secondary");
-        await buttons[1].click(); // Error button
-
-        const errorText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // 2. Click Error -> <ElseIf> branch
+        await page.click(".btn-error");
+        const errorText = await page.$eval(".error-msg", el => el.textContent.trim());
         assert.ok(errorText.includes("Something went wrong"));
 
-        await buttons[2].click(); // Ready button
-
-        const readyHeader = await page.$eval(".status-box h3", el => el.textContent.trim());
+        // 3. Click Ready -> <ElseIf> branch with nested <If> admin panel
+        await page.click(".btn-ready");
+        const readyHeader = await page.$eval(".dashboard-header", el => el.textContent.trim());
         assert.ok(readyHeader.includes("Dashboard Ready"));
+
+        // Check nested <If> computed condition (admin panel active)
+        const adminBadge = await page.$eval(".admin-badge", el => el.textContent.trim());
+        assert.ok(adminBadge.includes("Admin Control Panel Active"));
+
+        // 4. Toggle Details -> Nested <If> boolean condition
+        await page.click(".btn-toggle-details");
+        const detailsText = await page.$eval(".details-text", el => el.textContent.trim());
+        assert.ok(detailsText.includes("Sensitive system metrics"));
+
+        // 5. Toggle Role -> Nested <If> computed condition turns false
+        await page.click(".btn-toggle-role");
+        const adminPanel = await page.$(".admin-panel");
+        assert.equal(adminPanel, null);
+
+        // 6. Click None -> No branch matches and no Else -> Empty DOM range
+        await page.click(".btn-none");
+        const statusBox = await page.$(".status-box");
+        assert.equal(statusBox, null);
 
         await page.close();
     });
 
-    it("runs declarative switch app (examples/switch) toggling <Switch>, <Case>, <Default> DOM ranges in real browser", async () => {
+    it("runs declarative switch app (examples/switch) testing <Switch>, <Case>, <Default>, multiple values array, predicate matching, and nested <Switch> in real browser", async () => {
         const page = await browser.newPage();
         await page.goto(`http://localhost:${PORT}/examples/switch/index.html`, {
             waitUntil: "networkidle0"
         });
 
-        const loadingText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // 1. Initial single value match (<Case value="loading">)
+        const loadingText = await page.$eval(".loading-text", el => el.textContent.trim());
         assert.ok(loadingText.includes("Loading data"));
 
-        const buttons = await page.$$(".btn-secondary");
-        await buttons[1].click();
-
-        const processingText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // 2. Multiple values array match (<Case value=${["pending", "processing"]}>)
+        await page.click(".btn-processing");
+        const processingText = await page.$eval(".processing-text", el => el.textContent.trim());
         assert.ok(processingText.includes("Processing tasks"));
 
-        await buttons[2].click();
-
-        const completeHeader = await page.$eval(".status-box h3", el => el.textContent.trim());
+        // 3. Single value match (<Case value="complete">) with nested <Switch>
+        await page.click(".btn-complete");
+        const completeHeader = await page.$eval(".complete-header", el => el.textContent.trim());
         assert.ok(completeHeader.includes("Task Complete"));
 
-        await buttons[3].click();
+        // Check nested <Switch> summary view
+        const nestedSummary = await page.$eval(".nested-summary", el => el.textContent.trim());
+        assert.ok(nestedSummary.includes("Nested Switch: Summary View Active"));
 
-        const unknownText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // Toggle nested <Switch> view mode -> detail
+        await page.click(".btn-toggle-nested");
+        const nestedDetail = await page.$eval(".nested-detail", el => el.textContent.trim());
+        assert.ok(nestedDetail.includes("Nested Switch: Extended Technical Metrics View"));
+
+        // 4. Predicate function match (<Case value=${val => val > 100}>)
+        await page.click(".btn-score");
+        const scoreHeader = await page.$eval(".score-header", el => el.textContent.trim());
+        assert.ok(scoreHeader.includes("Predicate Case Matched: High Score (150)"));
+
+        // 5. Default fallback (<Default>)
+        await page.click(".btn-unknown");
+        const unknownText = await page.$eval(".unknown-text", el => el.textContent.trim());
         assert.ok(unknownText.includes("Unknown status state"));
+
+        // 6. Empty region (no match & no default)
+        await page.click(".btn-none");
+        const statusBox = await page.$(".status-box");
+        assert.equal(statusBox, null);
 
         await page.close();
     });
 
-    it("runs declarative loop app (examples/for) with <For>, <Continue>, <Break>, <Else> in real browser", async () => {
+    it("runs declarative loop app (examples/for) testing <For>, <Continue>, <Break>, <Else>, item addition/removal, and nested <For> in real browser", async () => {
         const page = await browser.newPage();
         await page.goto(`http://localhost:${PORT}/examples/for/index.html`, {
             waitUntil: "networkidle0"
         });
 
+        // 1. Initial keyed iteration (<Continue> skips inactive Mike, <Break> stops at StopHere)
         const initialCards = await page.$$eval(".user-card", cards => cards.map(c => c.textContent.trim()));
         assert.equal(initialCards.length, 2);
         assert.ok(initialCards[0].includes("John"));
         assert.ok(initialCards[1].includes("Anna"));
 
-        const buttons = await page.$$(".btn-secondary");
-        await buttons[0].click(); // Clear List
+        // Check nested <For> tags rendering
+        const johnTags = await page.$$eval(".user-card:first-child .tag-badge", tags => tags.map(t => t.textContent.trim()));
+        assert.deepEqual(johnTags, ["admin", "lead"]);
 
-        const emptyText = await page.$eval(".empty-card p", el => el.textContent.trim());
+        // 2. Add Item -> Dynamic item append
+        await page.click(".btn-add");
+        const countAfterAdd = await page.$$eval(".user-card", cards => cards.length);
+        assert.equal(countAfterAdd, 3); // John, Anna, User_xxxx
+
+        // 3. Remove Item -> Dynamic item removal
+        await page.click(".btn-remove");
+        const countAfterRemove = await page.$$eval(".user-card", cards => cards.length);
+        assert.equal(countAfterRemove, 2); // Anna, User_xxxx
+
+        // 4. Clear List -> Empty collection fallback <Else>
+        await page.click(".btn-clear");
+        const emptyText = await page.$eval(".empty-text", el => el.textContent.trim());
         assert.equal(emptyText, "No users found in collection.");
 
-        await buttons[1].click(); // Restore List
+        // 5. Restore List
+        await page.click(".btn-restore");
         const restoredCount = await page.$$eval(".user-card", cards => cards.length);
-        assert.equal(restoredCount, 2);
+        assert.equal(restoredCount, 2); // John, Anna
 
-        await buttons[2].click(); // Toggle Break
+        // 6. Toggle Break -> Loop includes David after StopHere
+        await page.click(".btn-toggle-stop");
         const countAfterToggle = await page.$$eval(".user-card", cards => cards.length);
         assert.equal(countAfterToggle, 3); // John, Anna, David
 
         await page.close();
     });
 
-    it("runs declarative try/catch app (examples/try_catch) catching errors & performing reset recovery in real browser", async () => {
+    it("runs declarative try/catch app (examples/try_catch) testing <Try>, <Catch>, non-Error thrown values, nested boundaries, rethrowing, static catch, and reset recovery in real browser", async () => {
         const page = await browser.newPage();
         await page.goto(`http://localhost:${PORT}/examples/try_catch/index.html`, {
             waitUntil: "networkidle0"
         });
 
-        const initialText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // 1. Single Boundary Error Capture
+        const initialText = await page.$eval(".status-msg", el => el.textContent.trim());
         assert.ok(initialText.includes("Dashboard is working smoothly"));
 
-        const causeBtn = await page.$(".btn-danger");
-        await causeBtn.click();
-
-        const errHeader = await page.$eval(".error-box h3", el => el.textContent.trim());
-        assert.equal(errHeader, "Caught UI Error");
-        const errDetail = await page.$eval(".error-box p", el => el.textContent.trim());
+        // Cause Error
+        await page.click(".btn-cause-error");
+        const errDetail = await page.$eval(".err-text", el => el.textContent.trim());
         assert.ok(errDetail.includes("Dashboard rendering failed"));
 
-        const fixBtn = await page.$(".btn-success");
-        await fixBtn.click();
-
-        const resetBtn = await page.$(".error-box button");
-        await resetBtn.click();
-
-        const recoveredText = await page.$eval(".status-box p", el => el.textContent.trim());
+        // Fix condition and reset boundary
+        await page.click(".btn-fix");
+        await page.click(".btn-reset");
+        const recoveredText = await page.$eval(".status-msg", el => el.textContent.trim());
         assert.ok(recoveredText.includes("Dashboard is working smoothly"));
+
+        // 2. Non-Error thrown string capture
+        await page.click(".btn-cause-string");
+        const stringErrText = await page.$eval(".err-text", el => el.textContent.trim());
+        assert.ok(stringErrText.includes("Raw String Error Thrown"));
+
+        await page.click(".btn-fix");
+        await page.click(".btn-reset");
+
+        // 3. Nested Boundaries & Rethrowing
+        await page.click(".btn-mode-nested");
+        const innerText = await page.$eval(".inner-msg", el => el.textContent.trim());
+        assert.ok(innerText.includes("Inner Subtree Data Loaded"));
+
+        // Inner error caught by inner boundary
+        await page.click(".btn-cause-error");
+        const innerErrText = await page.$eval(".inner-err-text", el => el.textContent.trim());
+        assert.ok(innerErrText.includes("Inner Component Local Error"));
+
+        await page.click(".btn-fix");
+        await page.click(".btn-reset-inner");
+
+        // Rethrow inside inner catch propagates to outer boundary
+        await page.click(".btn-cause-rethrow");
+        const outerErrText = await page.$eval(".outer-err-text", el => el.textContent.trim());
+        assert.ok(outerErrText.includes("Inner Boundary Error -> Rethrown to Outer"));
+
+        await page.click(".btn-fix");
+        await page.click(".btn-reset-outer");
+
+        // 4. Static Catch Mode
+        await page.click(".btn-mode-static");
+        await page.click(".btn-cause-error");
+        const staticErrBox = await page.$eval(".static-err-box h3", el => el.textContent.trim());
+        assert.equal(staticErrBox, "Static Fallback View");
 
         await page.close();
     });
@@ -243,6 +327,116 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await page.waitForSelector(".status-box h3");
         const user2Text = await page.$eval(".status-box p:nth-of-type(2)", el => el.textContent.trim());
         assert.ok(user2Text.includes("User #2 (Lemuel)"));
+
+        await page.close();
+    });
+
+    it("runs expressive delay & wait app (examples/delay_wait) testing all 3 modes (<Delay task>, <Wait for>, <Delay component>) with <Briefly> and <Failed> in real browser", async () => {
+        const page = await browser.newPage();
+        await page.goto(`http://localhost:${PORT}/examples/delay_wait/index.html`, {
+            waitUntil: "domcontentloaded"
+        });
+
+        // --- Mode 1: <Delay task> Mode ---
+        await page.waitForSelector(".briefly-text, .status-box h3");
+        await page.waitForSelector(".user-info");
+        const userInfo = await page.$eval(".user-info", el => el.textContent.trim());
+        assert.ok(userInfo.includes("User #1 (Lemuel)"));
+
+        // Trigger Fail State
+        await page.click(".btn-fail");
+        await page.waitForSelector(".failed-box h3");
+        const errHeader = await page.$eval(".failed-box h3", el => el.textContent.trim());
+        assert.equal(errHeader, "Operation Failed");
+
+        // Load Profile #2
+        await page.click(".btn-user-2");
+        await page.waitForSelector(".user-info");
+        const user2Info = await page.$eval(".user-info", el => el.textContent.trim());
+        assert.ok(user2Info.includes("User #2 (Lemuel)"));
+
+        // --- Mode 2: <Wait for> Mode ---
+        await page.click(".tab-wait");
+        await page.waitForSelector(".briefly-text-wait, .promise-val");
+        await page.waitForSelector(".promise-val");
+        const promiseVal = await page.$eval(".promise-val", el => el.textContent.trim());
+        assert.equal(promiseVal, "Single Promise Resolved Data");
+
+        // Reload Promise
+        await page.click(".btn-reload-promise");
+        await page.waitForSelector(".briefly-text-wait");
+        await page.waitForSelector(".promise-val");
+        const freshVal = await page.$eval(".promise-val", el => el.textContent.trim());
+        assert.equal(freshVal, "Fresh Promise Resolved Data");
+
+        // --- Mode 3: <Delay component> Mode ---
+        await page.click(".tab-component");
+        await page.waitForSelector(".briefly-text-comp, .lazy-widget h3");
+        await page.waitForSelector(".lazy-widget h3");
+        const widgetHeader = await page.$eval(".lazy-widget h3", el => el.textContent.trim());
+        assert.equal(widgetHeader, "Lazy Loaded Component");
+
+        // Fail Lazy Component
+        await page.click(".btn-fail-comp");
+        await page.waitForSelector(".comp-failed-box h3");
+        const compErrHeader = await page.$eval(".comp-failed-box h3", el => el.textContent.trim());
+        assert.equal(compErrHeader, "Component Import Failed");
+
+        // Retry Import
+        await page.click(".btn-load-comp");
+        await page.click(".btn-retry-comp");
+        await page.waitForSelector(".lazy-widget h3");
+        const retriedHeader = await page.$eval(".lazy-widget h3", el => el.textContent.trim());
+        assert.equal(retriedHeader, "Lazy Loaded Component");
+
+        await page.close();
+    });
+
+    it("runs dynamic render app (examples/render) testing <Render> component switching, prop & children forwarding, null unmounting, and parent execution count isolation in real browser", async () => {
+        const page = await browser.newPage();
+        await page.goto(`http://localhost:${PORT}/examples/render/index.html`, {
+            waitUntil: "networkidle0"
+        });
+
+        // 1. Initial ProfileView rendering
+        const profileHeader = await page.$eval(".profile-view h3", el => el.textContent.trim());
+        assert.equal(profileHeader, "Profile Component");
+
+        const profileTitle = await page.$eval(".profile-view .prop-title", el => el.textContent.trim());
+        assert.equal(profileTitle, "Title: User Account Overview");
+
+        const slottedContent = await page.$eval(".children-content", el => el.textContent.trim());
+        assert.equal(slottedContent, "Slotted Content Forwarded");
+
+        // Verify parent execution count is 1
+        const initialExec = await page.$eval(".exec-count", el => el.textContent.trim());
+        assert.equal(initialExec, "Parent Executions: 1");
+
+        // 2. Switch to SettingsView
+        await page.click(".btn-settings");
+        const settingsHeader = await page.$eval(".settings-view h3", el => el.textContent.trim());
+        assert.equal(settingsHeader, "Settings Component");
+
+        const settingsTitle = await page.$eval(".settings-view .prop-title", el => el.textContent.trim());
+        assert.equal(settingsTitle, "Title: User Settings View");
+
+        // Parent execution count must remain 1
+        const execAfterSettings = await page.$eval(".exec-count", el => el.textContent.trim());
+        assert.equal(execAfterSettings, "Parent Executions: 1");
+
+        // 3. Switch to AnalyticsView
+        await page.click(".btn-analytics");
+        const analyticsHeader = await page.$eval(".analytics-view h3", el => el.textContent.trim());
+        assert.equal(analyticsHeader, "Analytics Component");
+
+        // 4. Unmount component (component = null)
+        await page.click(".btn-null");
+        const renderedComp = await page.$(".status-box");
+        assert.equal(renderedComp, null);
+
+        // Parent execution count remains 1
+        const finalExec = await page.$eval(".exec-count", el => el.textContent.trim());
+        assert.equal(finalExec, "Parent Executions: 1");
 
         await page.close();
     });

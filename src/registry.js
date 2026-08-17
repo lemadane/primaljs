@@ -2,7 +2,7 @@
  * PrimalJS Component Registry
  */
 
-import { If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Async, Await, Pending } from "./control_flow.js";
+import { If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending } from "./control_flow.js";
 import { Render } from "./render.js";
 
 const registry = new Map();
@@ -32,7 +32,7 @@ export function clearRegistry() {
 }
 
 function registerDefaultComponents() {
-    register(If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Async, Await, Pending, Render);
+    register(If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending, Render);
 }
 
 registerDefaultComponents();

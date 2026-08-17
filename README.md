@@ -6,15 +6,15 @@ PrimalJS is a lightweight, production-capable Single Page Application (SPA) fram
 
 ---
 
-## 🎯 Core PrimalJS Principles
+## Core PrimalJS Principles
 
 - **Pure JavaScript**: Standard ECMAScript modules (`.js`) parsed directly by native browser engines.
 
 - **Function Components Only**: Clean, predictable function components. No class components, no hook rules.
 
 - **Native Tagged-Template Literals**: `html`...`` templates parsed directly using standard browser `<template>` elements.
-- **No JSX Compiler**: Write pure template strings without Babel, SWC, or 
-compilation steps.
+
+- **No JSX Compiler**: Write pure template strings without Babel, SWC, or compilation steps.
 
 - **No Transpiler**: Zero build steps required to run in production or development.
 
@@ -48,7 +48,7 @@ compilation steps.
 
 ---
 
-## 📦 How to Use PrimalJS in Other Projects
+## How to Use PrimalJS in Other Projects
 
 ### Method 1: Installing via NPM (Node.js & Bundled Projects)
 
@@ -140,7 +140,7 @@ compilation steps.
 
 ---
 
-## 🛠️ Comprehensive Feature & API Guide
+## Comprehensive Feature & API Guide
 
 #### A. `signal()` — State Management (Shopping Cart Quantity)
 ```javascript
@@ -275,7 +275,8 @@ html`
     </If>
 `
 
-#### 💡`<If>` / `<ElseIf>` / `<Else>`
+#### `<If>` / `<ElseIf>` / `<Else>`:
+
 - **Reactive Branch Swapping Without Parent Re-renders**: Evaluates condition functions (`when=${...}`) reactively and swaps real DOM node ranges directly without re-executing the enclosing parent component function.
 
 - **Automatic Lifecycle Cleanup**: When active branch switches, PrimalJS automatically disposes of unmounted branch contexts (`onDestroy` hooks, Signal effects, and event listeners).
@@ -306,7 +307,8 @@ html`
     </For>
 `
 
-#### 💡 `<For>`:
+#### `<For>`:
+
 - **Keyed DOM Identity Preservation**: Re-orders, inserts, or removes only altered item DOM nodes when the array mutates, keeping unchanged item DOM node instances intact.
 
 - **Declarative Skip & Early Termination (`<Continue />` & `<Break />`)**: Controls iteration declaratively within template subtrees without manual `.filter()` array transformations.
@@ -321,10 +323,10 @@ const status = signal("in_progress");
 html`
     <Switch value=${status}>
         <Case value="completed">
-            <span class="badge badge-success">✓ Completed</span>
+            <span class="badge badge-success">Completed</span>
         </Case>
         <Case value=${["in_progress", "pending"]}>
-            <span class="badge badge-warning">⏳ Processing...</span>
+            <span class="badge badge-warning">Processing...</span>
         </Case>
         <Case value=${v => typeof v === "number" && v > 100}>
             <span class="badge badge-info">High Priority (#${status})</span>
@@ -335,12 +337,15 @@ html`
     </Switch>
 `
 
-#### 💡 `<Switch>`:
+#### `<Switch>`:
+
 - **First-Match-Wins & No Fallthrough**: Unlike JavaScript `switch` statements, `<Switch>` uses clean first-match-wins order with zero risk of fallthrough errors and no `break` statements required.
+
 - **Flexible Value & Predicate Matching**: Supports plain values, reactive Signals, arrays of values (`value=${["a", "b"]}`), and predicate functions (`value=${v => v > 10}`).
+
 - **Zero Parent Component Re-execution**: Updates active DOM branch ranges directly without re-executing the surrounding component function.
 
-// Declarative Asynchronous Controls (<Async> & <Await>)
+// Declarative Asynchronous Controls (<Delay>, <Wait>, <Briefly>, <Failed>)
 const userId = signal(1);
 
 const fetchUserData = (id, { signal }) => {
@@ -348,67 +353,63 @@ const fetchUserData = (id, { signal }) => {
 };
 
 html`
-    <!-- <Async> automatically re-triggers when reactive Signals inside task change -->
-    <Async task=${({ signal }) => fetchUserData(userId.value, { signal })}>
+    <!-- <Delay> automatically re-triggers when reactive Signals inside task change -->
+    <Delay task=${({ signal }) => fetchUserData(userId.value, { signal })}>
         ${user => html`
             <div class="profile-card">
                 <h3>${user.name}</h3>
                 <p>Email: ${user.email}</p>
             </div>
         `}
-        <Pending>
+        <Briefly>
             <div class="loading-state">Fetching user data...</div>
-        </Pending>
-        <Catch>
+        </Briefly>
+        <Failed>
             ${(err, retry) => html`
                 <div class="error-state">
-                    <p>Error: ${err.message}</p>
+                    <p>Failed: ${err.message}</p>
                     <button onclick=${retry}>Retry Request</button>
                 </div>
             `}
-        </Catch>
-    </Async>
+        </Failed>
+    </Delay>
 `
 
-#### 💡 `<Async>` & `<Await>`:
+#### `<Delay>` & `<Wait>`:
 
-- **Suspense-Like Async Declaratives**: Renders `<Pending>` placeholder UI during Promise resolution without blocking surrounding layout or re-executing parent component functions (`executions === 1`).
+- **`<Delay task=${...}>`**: Handles reactive async task factories (auto-retriggering when referenced Signals change, with automatic `AbortSignal` fetch cancellation).
 
-- **Reactive Task Re-triggering**: `<Async task=${...}>` tracks reactive Signals used in task factories and automatically re-executes when dependencies update.
+- **`<Wait for=${...}>`**: Unwraps single Promise instances directly in templates.
 
-- **Automatic Request Abort Cancellation (`{ signal }`)**: Supplies an `AbortSignal` to abort stale in-flight fetch requests when Signal state changes or components unmount.
+- **`<Briefly>`**: Renders temporary loading placeholder UI while waiting for `<Delay>` or `<Wait>` to resolve.
 
-- **Built-in Error Recovery (`(err, retry)`)**: `<Catch>` provides a `retry` callback to re-trigger failed requests seamlessly.
+- **`<Failed>`**: Renders error fallback UI and provides a `(err, retry)` recovery callback if the task or promise fails.
 
-// Single Promise Resolution (<Await>)
+// Single Promise Unwrapping (<Wait>)
 const analyticsPromise = fetch("/api/analytics").then(res => res.json());
 
 html`
-    <!-- <Await> resolves a single Promise instance or Promise-returning function -->
-    <Await promise=${analyticsPromise}>
+    <!-- <Wait> unwraps a single Promise instance directly -->
+    <Wait for=${analyticsPromise}>
         ${data => html`
             <div class="stats-card">
                 <h3>Total Visits: ${data.visits}</h3>
                 <p>Conversions: ${data.conversions}</p>
             </div>
         `}
-        <Pending>
+        <Briefly>
             <div class="spinner">Loading analytics...</div>
-        </Pending>
-        <Catch>
+        </Briefly>
+        <Failed>
             ${(err, retry) => html`
                 <div>
                     <p>Failed: ${err.message}</p>
                     <button onclick=${retry}>Retry Request</button>
                 </div>
             `}
-        </Catch>
-    </Await>
+        </Failed>
+    </Wait>
 `
-
-#### 💡 Difference Between `<Async>` and `<Await>` in PrimalJS:
-- **`<Async task=${({ signal }) => ...}>`**: Takes a **task factory function**. Automatically re-executes whenever reactive Signals referenced inside the task factory mutate.
-- **`<Await promise=${promise}>`**: Takes a **direct Promise instance** (or function). Resolves a single Promise without auto-tracking outer Signal changes.
 
 // Dynamic Component Switcher (<Render>)
 function OverviewTab(props) {
@@ -430,15 +431,19 @@ html`
             <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
         </div>
 
-        <!-- Dynamically mounts activeTab component and passes reactive props -->
-        <Render component=${activeTab} props=${{ user: currentUser }} />
+        <!-- Dynamically mounts activeTab component and passes reactive props directly -->
+        <Render component=${activeTab} user=${currentUser} />
     </div>
 `
 
-#### 💡 `<Render>`:
+#### `<Render>`:
+
 - **Preserves Single Component Execution (`executions === 1`)**: In PrimalJS, component functions execute **exactly once** on initial mount and do not re-run on routine state changes. `<Render>` enables switching dynamic components or pages reactively when a Signal changes **without re-executing the parent layout/container function**.
+
 - **Deterministic Teardown & Context Disposal**: When `component` changes, `<Render>` automatically cleans up the unmounted component's entire context tree (executes `onDestroy` hooks, unbinds event listeners, unsubscribes signals, and removes DOM nodes).
+
 - **Foundation for Router Outlets & Dynamic Layouts**: `<Render>` powers `<RouteOutlet>`, dynamic tabbed interfaces, multi-step forms, and polymorphic plugin slots seamlessly.
+
 // Declarative Error Boundaries (<Try>, <Catch>)
 const hasError = signal(false);
 
@@ -455,7 +460,7 @@ html`
         <Catch>
             ${(err, reset) => html`
                 <div class="error-box">
-                    <p>⚠️ Exception: ${err.message}</p>
+                    <p>Exception: ${err.message}</p>
                     <button onclick=${() => {
                         hasError.value = false;
                         reset(); // Resets boundary and remounts protected component
@@ -468,7 +473,7 @@ html`
     </Try>
 `
 
-#### 💡 `<Try>` / `<Catch>`:
+#### `<Try>` / `<Catch>`:
 
 - **Prevents Full-Application Crashes**: Wraps render errors, lifecycle `onMount` failures, and reactive Signal compute exceptions inside protective DOM boundaries.
 
@@ -607,10 +612,14 @@ const app = createApp({
 app.mount("#app");
 ```
 
-#### 💡 Key Router Capabilities & Architectural Benefits:
+#### Key Router Capabilities & Architectural Benefits:
+
 - **Layout Preservation**: Navigating child routes (`/` -> `/users/101`) swaps only the `<RouteOutlet />` content without re-executing or destroying the parent `<AppLayout />` DOM instance.
+
 - **Dynamic Route Params (`useRoute()`)**: Extract URL parameters (like `:id`) reactively.
+
 - **Route Guards & Redirects (`beforeEnter`)**: Protect routes by returning a boolean or string redirect path.
+
 - **Integrated SEO (`head()`)**: Dynamically updates document `<title>`, `<meta>`, canonical links, and JSON-LD structured data on route transitions.
 
 ---
@@ -640,9 +649,12 @@ function disablePwa() {
 }
 ```
 
-#### 💡 PWA Management Capabilities:
+#### PWA Management Capabilities:
+
 - **Zero Runtime Dependencies**: Native Service Worker registration and event listeners.
+
 - **Update Detection (`updateStrategy: "prompt"`)**: Notifies application when an updated Service Worker is waiting (`onUpdateAvailable`).
+
 - **Safe Teardown (`unregisterServiceWorkers`)**: Safely unregisters PrimalJS service workers and purges `primal-` cache entries without touching unrelated third-party workers.
 
 ---
@@ -708,7 +720,7 @@ import { activate } from "primaljs";
 activate(ProductDetail, "#app");
 ```
 
-#### 💡 Why PrimalJS is 100% SEO Safe:
+#### Why PrimalJS is 100% SEO Safe:
 
 1. **True Pre-Render DOM Activation (`activate()`)**:
    Search engine crawlers receive fully formed, semantic HTML directly in the initial HTTP response. When client JavaScript executes `activate(App, "#app")`, PrimalJS locates deterministic markers (`<!--primal-ph-N-->`) and attaches behavior to the **existing DOM nodes** without clearing `innerHTML` or causing layout flashes.
@@ -721,7 +733,7 @@ activate(ProductDetail, "#app");
 
 ---
 
-## 🧪 Architecture & Verification
+## Architecture & Verification
 
 PrimalJS includes a comprehensive automated test suite verifying strict architectural guarantees:
 
@@ -738,6 +750,6 @@ npm test
 
 ---
 
-## 📜 License
+## License
 
 MIT License

@@ -10,7 +10,7 @@ export { html, unsafeHtml, TemplateResult } from "./html.js";
 export { mount, unmount } from "./mount.js";
 export { ref, isRef } from "./ref.js";
 export { Owner } from "./owner.js";
-export { If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Async, Await, Pending } from "./control_flow.js";
+export { If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending } from "./control_flow.js";
 export { Render } from "./render.js";
 export { createRouter, useRoute, navigate, RouteOutlet, Router } from "./router.js";
 export { head } from "./seo.js";

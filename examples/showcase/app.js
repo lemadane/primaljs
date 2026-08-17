@@ -22,7 +22,7 @@ import {
     Await,
     Pending,
     Render
-} from "./primal.js";
+} from "../../primal.js";
 
 // --- Global Reactive State ---
 const userCount = signal(3);
