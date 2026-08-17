@@ -367,7 +367,41 @@ export function RouteOutlet(props = {}) {
     const comp = computed(() => {
         if (!currentRouter) return null;
         const layers = currentRouter.activeLayers.value;
-        return layers && layers.length > depth ? layers[depth].component : null;
+        const layer = layers && layers.length > depth ? layers[depth] : null;
+        if (!layer || !layer.component) return null;
+
+        const compFn = layer.component;
+        const isLeaf = depth === layers.length - 1;
+        const paramsStr = JSON.stringify(layer.params || {});
+        const queryStr = isLeaf && currentRouter.activeQuery.value ? currentRouter.activeQuery.value.toString() : "";
+        const hashStr = isLeaf ? (currentRouter.activeHash.value || "") : "";
+        const routeKey = `${paramsStr}:${queryStr}:${hashStr}`;
+
+        if (!currentRouter.layerWrapperCache) {
+            currentRouter.layerWrapperCache = new WeakMap();
+        }
+
+        let compMap = currentRouter.layerWrapperCache.get(compFn);
+        if (!compMap) {
+            compMap = new Map();
+            currentRouter.layerWrapperCache.set(compFn, compMap);
+        }
+
+        const wrapperKey = `${depth}:${routeKey}`;
+
+        if (compMap.has(wrapperKey)) {
+            return compMap.get(wrapperKey);
+        }
+
+        const RouteWrapper = function RouteWrapper(p) {
+            return compFn(p);
+        };
+        if (compFn.name) {
+            Object.defineProperty(RouteWrapper, "name", { value: compFn.name });
+        }
+
+        compMap.set(wrapperKey, RouteWrapper);
+        return RouteWrapper;
     });
 
     return html`<Render component=${comp} />`;

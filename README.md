@@ -596,6 +596,7 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 - **Single Component Execution**: Component functions execute **exactly once** (`executions === 1`) on mount. Routine state changes mutate real DOM targets directly.
 - **DOM Identity Preservation**: Target DOM element instances remain untouched when state changes.
 - **Root Disposal**: `mount()` returns `{ dispose() }` for idempotent teardown of DOM nodes, event listeners, and subscriptions.
+- **Application Instance Scope**: PrimalJS assumes one primary root `createApp()` application per browser document for top-level window error event handling scope.
 
 ### Running Tests
 
