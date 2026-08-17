@@ -253,6 +253,13 @@ function SearchModal() {
 ```
 
 ### 2. Declarative Control Flow Helpers
+
+#### `<If>` / `<ElseIf>` / `<Else>`:
+
+- **Reactive Branch Swapping Without Parent Re-renders**: Evaluates condition functions (`when=${...}`) reactively and swaps real DOM node ranges directly without re-executing the enclosing parent component function.
+
+- **Automatic Lifecycle Cleanup**: When active branch switches, PrimalJS automatically disposes of unmounted branch contexts (`onDestroy` hooks, Signal effects, and event listeners).
+
 ```javascript
 import { html, signal, If, For, Switch, Case, Default, Try, Catch, Await, Pending, Render } from "primaljs";
 
@@ -275,11 +282,16 @@ html`
     </If>
 `
 
-#### `<If>` / `<ElseIf>` / `<Else>`:
 
-- **Reactive Branch Swapping Without Parent Re-renders**: Evaluates condition functions (`when=${...}`) reactively and swaps real DOM node ranges directly without re-executing the enclosing parent component function.
+#### `<For>`:
 
-- **Automatic Lifecycle Cleanup**: When active branch switches, PrimalJS automatically disposes of unmounted branch contexts (`onDestroy` hooks, Signal effects, and event listeners).
+- **Keyed DOM Identity Preservation**: Re-orders, inserts, or removes only altered item DOM nodes when the array mutates, keeping unchanged item DOM node instances intact.
+
+- **Declarative Skip & Early Termination (`<Continue />` & `<Break />`)**: Controls iteration declaratively within template subtrees without manual `.filter()` array transformations.
+
+- **Empty Collection Fallback (`<Else>`)**: Renders fallback DOM content automatically when the collection is empty (`length === 0`), `null`, or `undefined`.
+
+- **Automatic Item Context Teardown**: Disposes of unmounted item contexts (`onDestroy` lifecycle hooks, event listeners, and Signals) when items are removed from the array.
 
 // Keyed List Iteration (<For>, <Continue />, <Break />, <Else>)
 const users = signal([
@@ -307,15 +319,6 @@ html`
     </For>
 `
 
-#### `<For>`:
-
-- **Keyed DOM Identity Preservation**: Re-orders, inserts, or removes only altered item DOM nodes when the array mutates, keeping unchanged item DOM node instances intact.
-
-- **Declarative Skip & Early Termination (`<Continue />` & `<Break />`)**: Controls iteration declaratively within template subtrees without manual `.filter()` array transformations.
-
-- **Empty Collection Fallback (`<Else>`)**: Renders fallback DOM content automatically when the collection is empty (`length === 0`), `null`, or `undefined`.
-
-- **Automatic Item Context Teardown**: Disposes of unmounted item contexts (`onDestroy` lifecycle hooks, event listeners, and Signals) when items are removed from the array.
 
 // Branch Matching (<Switch>, <Case>, <Default>)
 const status = signal("in_progress");
