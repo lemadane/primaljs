@@ -364,43 +364,49 @@ export function RouteOutlet(props = {}) {
     }
 
     const currentRouter = globalRouterInstance;
+
+    let previousComponent = null;
+    let previousRouteKey = null;
+    let previousWrapper = null;
+
     const comp = computed(() => {
-        if (!currentRouter) return null;
+        if (!currentRouter) {
+            previousComponent = null;
+            previousRouteKey = null;
+            previousWrapper = null;
+            return null;
+        }
         const layers = currentRouter.activeLayers.value;
         const layer = layers && layers.length > depth ? layers[depth] : null;
-        if (!layer || !layer.component) return null;
+        if (!layer || !layer.component) {
+            previousComponent = null;
+            previousRouteKey = null;
+            previousWrapper = null;
+            return null;
+        }
 
-        const compFn = layer.component;
+        const component = layer.component;
         const isLeaf = depth === layers.length - 1;
-        const paramsStr = JSON.stringify(layer.params || {});
-        const queryStr = isLeaf && currentRouter.activeQuery.value ? currentRouter.activeQuery.value.toString() : "";
-        const hashStr = isLeaf ? (currentRouter.activeHash.value || "") : "";
-        const routeKey = `${paramsStr}:${queryStr}:${hashStr}`;
+        const paramsKey = JSON.stringify(layer.params || {});
+        const queryKey = isLeaf && currentRouter.activeQuery.value ? currentRouter.activeQuery.value.toString() : "";
+        const hashKey = isLeaf ? (currentRouter.activeHash.value || "") : "";
+        const routeKey = `${paramsKey}:${queryKey}:${hashKey}`;
 
-        if (!currentRouter.layerWrapperCache) {
-            currentRouter.layerWrapperCache = new WeakMap();
+        if (component === previousComponent && routeKey === previousRouteKey) {
+            return previousWrapper;
         }
 
-        let compMap = currentRouter.layerWrapperCache.get(compFn);
-        if (!compMap) {
-            compMap = new Map();
-            currentRouter.layerWrapperCache.set(compFn, compMap);
-        }
-
-        const wrapperKey = `${depth}:${routeKey}`;
-
-        if (compMap.has(wrapperKey)) {
-            return compMap.get(wrapperKey);
-        }
-
-        const RouteWrapper = function RouteWrapper(p) {
-            return compFn(p);
+        const RouteWrapper = function RouteWrapper(routeProps) {
+            return component(routeProps);
         };
-        if (compFn.name) {
-            Object.defineProperty(RouteWrapper, "name", { value: compFn.name });
+        if (component.name) {
+            Object.defineProperty(RouteWrapper, "name", { value: component.name });
         }
 
-        compMap.set(wrapperKey, RouteWrapper);
+        previousComponent = component;
+        previousRouteKey = routeKey;
+        previousWrapper = RouteWrapper;
+
         return RouteWrapper;
     });
 

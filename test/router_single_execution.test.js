@@ -84,6 +84,62 @@ describe("Router Component Single Execution Guarantee (Requirement: executions =
         router.destroy();
     });
 
+    it("updates route content when query parameters change on same route component (/search?q=java -> /search?q=spring)", async () => {
+        function SearchPage() {
+            const route = useRoute();
+            return html`<h1 id="query-term">Query: ${route.query.get("q")}</h1>`;
+        }
+
+        const router = createRouter({
+            routes: [
+                {
+                    path: "/search",
+                    component: SearchPage
+                }
+            ]
+        });
+
+        const app = createApp({ router });
+        const handle = app.mount("#app");
+
+        await router.resolveRoute("/search", "?q=java");
+        assert.equal(document.querySelector("#query-term").textContent.trim(), "Query: java");
+
+        await router.resolveRoute("/search", "?q=spring");
+        assert.equal(document.querySelector("#query-term").textContent.trim(), "Query: spring");
+
+        handle.dispose();
+        router.destroy();
+    });
+
+    it("updates route content when URL hash fragment changes on same route component (/docs#install -> /docs#configuration)", async () => {
+        function DocsPage() {
+            const route = useRoute();
+            return html`<h1 id="hash-target">Section: ${route.hash}</h1>`;
+        }
+
+        const router = createRouter({
+            routes: [
+                {
+                    path: "/docs",
+                    component: DocsPage
+                }
+            ]
+        });
+
+        const app = createApp({ router });
+        const handle = app.mount("#app");
+
+        await router.resolveRoute("/docs", "", "#install");
+        assert.equal(document.querySelector("#hash-target").textContent.trim(), "Section: #install");
+
+        await router.resolveRoute("/docs", "", "#configuration");
+        assert.equal(document.querySelector("#hash-target").textContent.trim(), "Section: #configuration");
+
+        handle.dispose();
+        router.destroy();
+    });
+
     it("preserves parent layout component while remounting leaf route component on parameter changes", async () => {
         let layoutExecutions = 0;
         let pageExecutions = 0;
