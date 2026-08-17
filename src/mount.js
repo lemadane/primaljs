@@ -18,21 +18,28 @@ export function mount(Component, target) {
     const rootCtx = new ComponentContext(Component.name || "Root");
     targetEl._primalCtx = rootCtx;
 
-    pushContext(rootCtx);
-    let result;
     try {
-        result = typeof Component === "function" ? Component() : Component;
-    } finally {
-        popContext();
-    }
+        pushContext(rootCtx);
+        let result;
+        try {
+            result = typeof Component === "function" ? Component() : Component;
+        } finally {
+            popContext();
+        }
 
-    targetEl.innerHTML = "";
-    const domNode = convertToDOMNode(result, rootCtx);
-    if (domNode) {
-        targetEl.appendChild(domNode);
-    }
+        targetEl.innerHTML = "";
+        const domNode = convertToDOMNode(result, rootCtx);
+        if (domNode) {
+            targetEl.appendChild(domNode);
+        }
 
-    triggerMount(rootCtx);
+        triggerMount(rootCtx);
+    } catch (err) {
+        delete targetEl._primalCtx;
+        destroyContext(rootCtx);
+        targetEl.innerHTML = "";
+        throw err;
+    }
 
     const appHandle = {
         dispose() {

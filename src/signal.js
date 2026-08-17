@@ -3,6 +3,7 @@
  */
 
 import { getCurrentContext } from "./lifecycle.js";
+import { reportGlobalError } from "./app.js";
 
 let activeEffect = null;
 const effectStack = [];
@@ -54,7 +55,7 @@ export class Signal {
     }
 
     get value() {
-        if (activeEffect) {
+        if (activeEffect && !activeEffect.disposed) {
             this.subscribers.add(activeEffect);
             activeEffect.deps.add(this);
         }
@@ -71,6 +72,10 @@ export class Signal {
     notify() {
         const subs = Array.from(this.subscribers);
         for (const sub of subs) {
+            if (sub.disposed) {
+                this.subscribers.delete(sub);
+                continue;
+            }
             if (batchDepth > 0) {
                 pendingNotifyEffects.add(sub);
             } else {
@@ -97,9 +102,16 @@ export class Computed {
         this.deps = new Set();
         this.__isSignal = true;
         this.__isComputed = true;
+        this._disposed = false;
+
+        const ctx = getCurrentContext();
+        if (ctx) {
+            ctx.addEffect(() => this.dispose());
+        }
 
         this._effect = {
             run: () => {
+                if (this._disposed) return;
                 if (!this._dirty) {
                     this._dirty = true;
                     this.notify();
@@ -111,6 +123,10 @@ export class Computed {
     }
 
     get value() {
+        if (this._disposed) {
+            return this._value;
+        }
+
         if (this._dirty) {
             this._cleanupDeps();
             effectStack.push(this._effect);
@@ -133,7 +149,7 @@ export class Computed {
             this._dirty = false;
         }
 
-        if (activeEffect) {
+        if (activeEffect && !activeEffect.disposed) {
             this.subscribers.add(activeEffect);
             activeEffect.deps.add(this);
         }
@@ -149,14 +165,27 @@ export class Computed {
     }
 
     notify() {
+        if (this._disposed) return;
         const subs = Array.from(this.subscribers);
         for (const sub of subs) {
+            if (sub.disposed) {
+                this.subscribers.delete(sub);
+                continue;
+            }
             if (batchDepth > 0) {
                 pendingNotifyEffects.add(sub);
             } else {
                 sub.run();
             }
         }
+    }
+
+    dispose() {
+        if (this._disposed) return;
+        this._disposed = true;
+        this._cleanupDeps();
+        this._effect.disposed = true;
+        this.subscribers.clear();
     }
 
     toString() {
@@ -176,6 +205,9 @@ export class ReactiveEffect {
         this.cleanupFn = null;
         const ctx = getCurrentContext();
         this.tryBoundary = ctx ? ctx.tryBoundary : null;
+        if (ctx) {
+            ctx.addEffect(() => this.dispose());
+        }
         this.run();
     }
 
@@ -195,6 +227,7 @@ export class ReactiveEffect {
                 this.tryBoundary.handleError(err);
                 return;
             }
+            reportGlobalError(err, { type: "effect" });
             throw err;
         } finally {
             activeEffect = prevActive;
@@ -207,7 +240,7 @@ export class ReactiveEffect {
             try {
                 this.cleanupFn();
             } catch (err) {
-                console.error("Error running effect cleanup:", err);
+                reportGlobalError(err, { type: "effect_cleanup" });
             }
             this.cleanupFn = null;
         }

@@ -13,6 +13,7 @@ import {
     triggerMount,
     destroyContext
 } from "./lifecycle.js";
+import { reportGlobalError } from "./app.js";
 
 const templateCache = new WeakMap();
 
@@ -464,7 +465,7 @@ function bindEvent(targetElement, attrName, handler, ctx) {
             if (tryBoundary && typeof tryBoundary.handleError === "function" && !tryBoundary.isDestroyed) {
                 tryBoundary.handleError(err);
             } else {
-                console.error(`Error in event handler for ${eventName}:`, err);
+                reportGlobalError(err, { type: "event_handler", event: eventName, component: ctx ? ctx.name : null });
             }
         }
     };
@@ -532,7 +533,24 @@ function bindStyleObject(el, styleObj, ctx) {
     }
 }
 
+const URL_ATTRS = ["href", "src", "action", "formaction", "data", "xlink:href"];
+
+function sanitizeUrl(val) {
+    if (typeof val !== "string") return val;
+    const clean = val.trim().replace(/[\u0000-\u001F\u007F-\u009F]/g, "");
+    if (/^(?:javascript|vbscript|data:text\/html):/i.test(clean)) {
+        console.warn(`[PrimalJS Security Warning]: Blocked dangerous URL protocol (${clean})`);
+        return "about:blank";
+    }
+    return val;
+}
+
 function setElementAttribute(el, attr, val) {
+    const attrLower = attr.toLowerCase();
+    if (URL_ATTRS.includes(attrLower)) {
+        val = sanitizeUrl(val);
+    }
+
     const isSvg = el.namespaceURI === "http://www.w3.org/2000/svg";
 
     if (isSvg) {

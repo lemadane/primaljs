@@ -2,6 +2,8 @@
  * PrimalJS Owner — Shared Ownership & Resource Disposal Tree
  */
 
+import { reportGlobalError } from "./app.js";
+
 export class Owner {
     constructor(name = "Owner") {
         this.name = name;
@@ -37,7 +39,14 @@ export class Owner {
         if (this.isDestroyed) return;
         this.isDestroyed = true;
 
-        for (const child of this.children) {
+        if (this.parent && Array.isArray(this.parent.children)) {
+            const idx = this.parent.children.indexOf(this);
+            if (idx !== -1) {
+                this.parent.children.splice(idx, 1);
+            }
+        }
+
+        for (const child of [...this.children]) {
             child.dispose();
         }
         this.children = [];
@@ -46,7 +55,7 @@ export class Owner {
             try {
                 hook();
             } catch (err) {
-                console.error(`Error in onDestroy hook of ${this.name}:`, err);
+                reportGlobalError(err, { type: "onDestroy", component: this.name });
             }
         }
         this.destroyHooks = [];
@@ -55,7 +64,7 @@ export class Owner {
             try {
                 disposer();
             } catch (err) {
-                console.error(`Error disposing effect in ${this.name}:`, err);
+                reportGlobalError(err, { type: "effect_cleanup", component: this.name });
             }
         }
         this.effects = [];

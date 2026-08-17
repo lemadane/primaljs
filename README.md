@@ -27,7 +27,7 @@ PrimalJS is a lightweight, production-ready Single Page Application (SPA) framew
   - [`<Render>` — Dynamic Component Switcher](#render--dynamic-component-switcher)
   - [`<Try>`, `<Catch>` — UI Error Boundaries](#try-catch--ui-error-boundaries)
 - [Client-Side SPA Router & Layouts](#client-side-spa-router--layouts)
-- [SEO Safety & Pre-rendered DOM Activation](#seo-safety--pre-rendered-dom-activation)
+- [SEO & Pre-rendered DOM Activation](#seo--pre-rendered-dom-activation)
   - [`head()` — Dynamic Head Metadata](#head--dynamic-head-metadata)
   - [`activate()` — Zero-Flash Hydration](#activate--zero-flash-hydration)
 - [Zero-Dependency PWA Management](#zero-dependency-pwa-management)
@@ -467,7 +467,7 @@ function UserDetail() {
 
     head({
         title: `User Profile #${route.params.id} | My App`,
-        meta: [{ name: "description", content: `Profile page for User ${route.params.id}` }]
+        description: `Profile page for User ${route.params.id}`
     });
 
     return html`<h2>User Profile ID: ${route.params.id}</h2>`;
@@ -492,9 +492,9 @@ app.mount("#app");
 
 ---
 
-## SEO Safety & Pre-rendered DOM Activation
+## SEO & Pre-rendered DOM Activation
 
-PrimalJS is **100% SEO safe** out of the box for search engines (Googlebot, Bingbot) and social crawlers.
+PrimalJS is designed to support SEO-friendly pre-rendering and server-rendered DOM activation.
 
 ### `head()` — Dynamic Head Metadata
 
@@ -503,14 +503,25 @@ Dynamically manages document `<title>`, meta tags, OpenGraph cards, canonical li
 ```javascript
 import { head } from "primaljs";
 
+// Primary flat options API:
+head({
+    title: "Product Detail | My Store",
+    description: "High quality software components.",
+    image: "https://example.com/og.png",
+    robots: "index, follow",
+    canonical: "https://example.com/product",
+    jsonLd: { "@context": "https://schema.org", "@type": "Product", name: "Widget" }
+});
+
+// Advanced custom meta/link tags array API:
 head({
     title: "Product Detail | My Store",
     meta: [
-        { name: "description", content: "High quality software components." },
-        { property: "og:title", content: "Product Detail" }
+        { name: "keywords", content: "framework, javascript, reactive" },
+        { property: "og:type", content: "website" }
     ],
     link: [
-        { rel: "canonical", href: "https://example.com/product" }
+        { rel: "alternate", href: "https://example.com/fr/product" }
     ]
 });
 ```
@@ -552,6 +563,32 @@ unregisterServiceWorkers("./sw.js");
 
 ---
 
+## Security & XSS Prevention
+
+PrimalJS is built with strict security defaults to protect applications against Cross-Site Scripting (XSS) and protocol injection vulnerabilities:
+
+### 1. Safe-by-Default HTML Escaping
+All dynamic string values interpolated inside tagged template literals (`html\`<div>${userInput}</div>\``) are converted into DOM Text Nodes using `document.createTextNode()`. Raw HTML strings, `<script>` tags, or malicious attributes like `<img src=x onerror=alert(1)>` are rendered harmlessly as plain text.
+
+### 2. Explicit Raw HTML (`unsafeHtml`)
+To render unescaped HTML content (such as rich text editor output), developers must explicitly use `unsafeHtml(trustedHtml)`:
+
+```javascript
+import { html, unsafeHtml } from "primaljs";
+
+// WARNING: Always sanitize untrusted HTML (e.g., using DOMPurify) before passing to unsafeHtml()
+const userBio = DOMPurify.sanitize(rawHtmlInput);
+
+function UserProfile() {
+    return html`<div class="bio">${unsafeHtml(userBio)}</div>`;
+}
+```
+
+### 3. Automatic URL Protocol Sanitization
+PrimalJS automatically inspects URL attributes (`href`, `src`, `action`, `formaction`, `data`) bound via template expressions. Dangerous URL protocol schemes (`javascript:`, `vbscript:`, `data:text/html`) are neutralized automatically to `"about:blank"` to block script execution attacks.
+
+---
+
 ## Architecture & Verification
 
 PrimalJS enforces strict architectural guarantees across its test suite:
@@ -563,11 +600,33 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 ### Running Tests
 
 ```bash
-# Run unit & integration test suite (111/111 passing)
-npm test
+# Run unit & integration test suite (134/134 passing)
+npm run test:unit
 
-# Run Headless Chrome E2E browser suite (9/9 passing)
+# Run cross-browser E2E engine suite (Chromium, Firefox, Safari/WebKit, Edge, Android)
+npm run test:e2e:cross
+
+# Run full test suite
 npm run test:e2e
+```
+
+### Repeated Full Matrix Verification
+
+```text
+=== MATRIX REPEATED PASS 1 ===
+ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
+
+=== MATRIX REPEATED PASS 2 ===
+ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
+
+=== MATRIX REPEATED PASS 3 ===
+ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
 ```
 
 ---

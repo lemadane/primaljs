@@ -43,22 +43,28 @@ export function activate(App, target, initialState = {}) {
     const rootCtx = new ComponentContext(App.name || "Root");
     targetEl._primalCtx = rootCtx;
 
-    let compResult;
-    pushContext(rootCtx);
     try {
-        if (typeof App === "function") {
-            compResult = App(serializedState);
+        let compResult;
+        pushContext(rootCtx);
+        try {
+            if (typeof App === "function") {
+                compResult = App(serializedState);
+            }
+        } finally {
+            popContext();
         }
-    } finally {
-        popContext();
-    }
 
-    if (compResult && compResult instanceof TemplateResult) {
-        activateTemplate(targetEl, compResult, rootCtx);
-    }
+        if (compResult && compResult instanceof TemplateResult) {
+            activateTemplate(targetEl, compResult, rootCtx);
+        }
 
-    // Trigger onMount hooks recursively on activated DOM context
-    triggerMount(rootCtx);
+        // Trigger onMount hooks recursively on activated DOM context
+        triggerMount(rootCtx);
+    } catch (err) {
+        delete targetEl._primalCtx;
+        destroyContext(rootCtx);
+        throw err;
+    }
 
     const appHandle = {
         dispose() {

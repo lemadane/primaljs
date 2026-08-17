@@ -8,6 +8,7 @@ import { html } from "./html.js";
 import { Render } from "./render.js";
 import { head } from "./seo.js";
 import { getCurrentContext, pushContext, popContext } from "./lifecycle.js";
+import { reportGlobalError } from "./app.js";
 
 const currentRouteSignal = signal({
     path: "/",
@@ -98,6 +99,7 @@ function matchRouteTree(routes, path) {
 export class Router {
     constructor(options = {}) {
         this.routes = options.routes || [];
+        this.onError = options.onError || null;
         this.activeLayers = signal([]);
         this.activeParams = signal({});
         this.activeQuery = signal(new URLSearchParams());
@@ -129,105 +131,135 @@ export class Router {
     }
 
     async resolveRoute(path, search = "", hash = "", navigationToken = ++globalNavigationId) {
-        if (this.redirectDepth > 10) {
-            this.redirectDepth = 0;
-            throw new Error("PrimalJS Router: Maximum redirect depth (10) exceeded.");
-        }
+        try {
+            if (this.redirectDepth > 10) {
+                this.redirectDepth = 0;
+                throw new Error("PrimalJS Router: Maximum redirect depth (10) exceeded.");
+            }
 
-        const query = new URLSearchParams(search);
-        const matchedLayers = matchRouteTree(this.routes, path);
+            const query = new URLSearchParams(search);
+            const matchedLayers = matchRouteTree(this.routes, path);
 
-        if (matchedLayers.length === 0) {
-            this.activeLayers.value = [];
-            this.activeParams.value = {};
-            this.activeQuery.value = query;
-            this.activeHash.value = hash;
-            currentRouteSignal.value = {
-                path,
-                params: {},
-                query,
-                hash,
-                component: null,
-                meta: null
-            };
-            return;
-        }
-
-        const leafLayer = matchedLayers[matchedLayers.length - 1];
-
-        if (leafLayer.route.redirect) {
-            this.redirectDepth++;
-            let redirectTarget = typeof leafLayer.route.redirect === "function"
-                ? leafLayer.route.redirect({ path, params: leafLayer.params, query })
-                : leafLayer.route.redirect;
-            if (redirectTarget) {
-                this.navigate(redirectTarget, { replace: true });
+            if (matchedLayers.length === 0) {
+                this.activeLayers.value = [];
+                this.activeParams.value = {};
+                this.activeQuery.value = query;
+                this.activeHash.value = hash;
+                currentRouteSignal.value = {
+                    path,
+                    params: {},
+                    query,
+                    hash,
+                    component: null,
+                    meta: null
+                };
                 return;
             }
-        }
-        this.redirectDepth = 0;
 
-        for (const layer of matchedLayers) {
-            if (typeof layer.route.beforeEnter === "function") {
-                const routeInfo = { path, params: layer.params, query, hash };
-                const result = await layer.route.beforeEnter(routeInfo);
+            const leafLayer = matchedLayers[matchedLayers.length - 1];
 
-                if (navigationToken !== globalNavigationId) {
-                    return;
-                }
-
-                if (result === false) {
-                    if (typeof window !== "undefined") {
-                        window.history.replaceState({}, "", currentRouteSignal.value.path);
-                    }
-                    return;
-                }
-                if (typeof result === "string") {
-                    this.navigate(result, { replace: true });
+            if (leafLayer.route.redirect) {
+                this.redirectDepth++;
+                let redirectTarget = typeof leafLayer.route.redirect === "function"
+                    ? leafLayer.route.redirect({ path, params: leafLayer.params, query })
+                    : leafLayer.route.redirect;
+                if (redirectTarget) {
+                    this.navigate(redirectTarget, { replace: true });
                     return;
                 }
             }
-        }
+            this.redirectDepth = 0;
 
-        const leafMeta = leafLayer.meta || (matchedLayers[0] && matchedLayers[0].meta) || null;
+            for (const layer of matchedLayers) {
+                if (typeof layer.route.beforeEnter === "function") {
+                    const routeInfo = { path, params: layer.params, query, hash };
+                    const result = await layer.route.beforeEnter(routeInfo);
 
-        this.activeLayers.value = matchedLayers;
-        this.activeParams.value = leafLayer.params;
-        this.activeQuery.value = query;
-        this.activeHash.value = hash;
-        this.activeMeta.value = leafMeta;
-
-        currentRouteSignal.value = {
-            path,
-            params: leafLayer.params,
-            query,
-            hash,
-            component: leafLayer.component,
-            meta: leafMeta
-        };
-
-        head(leafMeta);
-
-        if (typeof window !== "undefined") {
-            if (hash) {
-                const targetId = hash.slice(1);
-                setTimeout(() => {
-                    const targetEl = document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`);
-                    if (targetEl && typeof targetEl.scrollIntoView === "function") {
-                        try { targetEl.scrollIntoView(); } catch (_) {}
+                    if (navigationToken !== globalNavigationId) {
+                        return;
                     }
-                }, 0);
+
+                    if (result === false) {
+                        if (typeof window !== "undefined") {
+                            window.history.replaceState({}, "", currentRouteSignal.value.path);
+                        }
+                        return;
+                    }
+                    if (typeof result === "string") {
+                        this.navigate(result, { replace: true });
+                        return;
+                    }
+                }
+            }
+
+            // Resolve dynamic component functions / ES module loaders
+            for (const layer of matchedLayers) {
+                if (typeof layer.component === "function") {
+                    if (layer.component.kind === undefined && !layer.component.__isComponent) {
+                        try {
+                            const res = layer.component();
+                            if (res && typeof res.then === "function") {
+                                const mod = await res;
+                                if (navigationToken !== globalNavigationId) {
+                                    return;
+                                }
+                                layer.component = (mod && mod.default) ? mod.default : mod;
+                            }
+                        } catch (compErr) {
+                            if (navigationToken !== globalNavigationId) return;
+                            throw compErr;
+                        }
+                    }
+                }
+            }
+
+            const leafMeta = leafLayer.meta || (matchedLayers[0] && matchedLayers[0].meta) || null;
+
+            this.activeLayers.value = matchedLayers;
+            this.activeParams.value = leafLayer.params;
+            this.activeQuery.value = query;
+            this.activeHash.value = hash;
+            this.activeMeta.value = leafMeta;
+
+            currentRouteSignal.value = {
+                path,
+                params: leafLayer.params,
+                query,
+                hash,
+                component: leafLayer.component,
+                meta: leafMeta
+            };
+
+            head(leafMeta);
+
+            if (typeof window !== "undefined") {
+                if (hash) {
+                    const targetId = hash.slice(1);
+                    setTimeout(() => {
+                        const targetEl = document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`);
+                        if (targetEl && typeof targetEl.scrollIntoView === "function") {
+                            try { targetEl.scrollIntoView(); } catch (_) {}
+                        }
+                    }, 0);
+                } else {
+                    try { window.scrollTo(0, 0); } catch (_) {}
+                }
+
+                if (leafLayer.route.focus) {
+                    setTimeout(() => {
+                        const focusEl = document.querySelector(leafLayer.route.focus);
+                        if (focusEl && typeof focusEl.focus === "function") {
+                            try { focusEl.focus(); } catch (_) {}
+                        }
+                    }, 0);
+                }
+            }
+        } catch (err) {
+            if (navigationToken !== globalNavigationId) return;
+            if (typeof this.onError === "function") {
+                this.onError(err, { path, search, hash });
             } else {
-                try { window.scrollTo(0, 0); } catch (_) {}
-            }
-
-            if (leafLayer.route.focus) {
-                setTimeout(() => {
-                    const focusEl = document.querySelector(leafLayer.route.focus);
-                    if (focusEl && typeof focusEl.focus === "function") {
-                        try { focusEl.focus(); } catch (_) {}
-                    }
-                }, 0);
+                reportGlobalError(err, { type: "router", path, search, hash });
             }
         }
     }

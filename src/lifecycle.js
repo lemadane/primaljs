@@ -3,6 +3,7 @@
  */
 
 import { Owner } from "./owner.js";
+import { reportGlobalError } from "./app.js";
 
 export class ComponentContext extends Owner {
     constructor(name = "Component") {
@@ -58,10 +59,10 @@ export function triggerMount(ctx) {
             if (ctx.tryBoundary && typeof ctx.tryBoundary.handleError === "function" && !ctx.tryBoundary.isDestroyed) {
                 ctx.tryBoundary.handleError(err);
             } else {
-                console.error(`Error in onMount hook of ${ctx.name}:`, err);
+                reportGlobalError(err, { type: "onMount", component: ctx.name });
             }
         }
-    }
+    };
     ctx.mountHooks = [];
 
     for (const child of [...ctx.children]) {

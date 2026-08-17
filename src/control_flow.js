@@ -14,6 +14,7 @@ import {
     onDestroy
 } from "./lifecycle.js";
 import { convertToDOMNode, resolveInnerSubtree } from "./html.js";
+import { reportGlobalError } from "./app.js";
 
 /**
  * <ElseIf> Component helper
@@ -1462,6 +1463,7 @@ export function Try(props) {
             if (parentTryBoundary && typeof parentTryBoundary.handleError === "function") {
                 parentTryBoundary.handleError(err);
             } else {
+                reportGlobalError(err, { type: "try_catch", component: ctx ? ctx.name : null });
                 throw err;
             }
             return;

@@ -10,8 +10,7 @@ import {
     popContext,
     getCurrentContext,
     triggerMount,
-    destroyContext,
-    onDestroy
+    destroyContext
 } from "./lifecycle.js";
 import { convertToDOMNode } from "./html.js";
 
@@ -45,6 +44,14 @@ export function Render(props) {
     let activeCompFn = null;
     let activeCompCtx = null;
 
+    function cleanupActiveComp() {
+        if (activeCompCtx) {
+            destroyContext(activeCompCtx);
+            activeCompCtx = null;
+        }
+        clearAnchorRange(startAnchor, endAnchor);
+    }
+
     const disposer = effect(() => {
         let compFn = props ? props.component : null;
         if (isSignal(compFn)) {
@@ -54,11 +61,7 @@ export function Render(props) {
         }
 
         if (compFn === null || compFn === undefined) {
-            if (activeCompCtx) {
-                destroyContext(activeCompCtx);
-                activeCompCtx = null;
-            }
-            clearAnchorRange(startAnchor, endAnchor);
+            cleanupActiveComp();
             activeCompFn = null;
             return;
         }
@@ -71,18 +74,10 @@ export function Render(props) {
             return;
         }
 
-        if (activeCompCtx) {
-            destroyContext(activeCompCtx);
-            activeCompCtx = null;
-        }
-        clearAnchorRange(startAnchor, endAnchor);
+        cleanupActiveComp();
 
         activeCompFn = compFn;
         activeCompCtx = new ComponentContext(compFn.name || "RenderedComponent");
-
-        if (ctx && !ctx.children.includes(activeCompCtx)) {
-            ctx.children.push(activeCompCtx);
-        }
 
         const forwardedProps = {};
         if (props) {
@@ -111,12 +106,9 @@ export function Render(props) {
     });
 
     if (ctx) {
-        ctx.addEffect(disposer);
-        onDestroy(() => {
-            if (activeCompCtx) {
-                destroyContext(activeCompCtx);
-                activeCompCtx = null;
-            }
+        ctx.addEffect(() => {
+            disposer();
+            cleanupActiveComp();
         });
     }
 

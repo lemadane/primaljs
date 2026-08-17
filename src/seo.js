@@ -44,14 +44,36 @@ export function head(meta = {}) {
         removeMetaTag("name", "robots");
     }
 
-    // 5. Canonical URL
+    // 5. Canonical Link
     if (m.canonical) {
         setLinkTag("canonical", m.canonical);
     } else {
         removeLinkTag("canonical");
     }
 
-    // 6. JSON-LD Structured Data
+    // 6. Custom meta tags array (meta: [{ name: "...", content: "..." }, { property: "...", content: "..." }])
+    if (Array.isArray(m.meta)) {
+        for (const item of m.meta) {
+            if (item) {
+                const keyAttr = item.name ? "name" : (item.property ? "property" : (item.httpEquiv ? "http-equiv" : null));
+                const keyVal = item.name || item.property || item.httpEquiv;
+                if (keyAttr && keyVal && item.content !== undefined) {
+                    setMetaTag(keyAttr, keyVal, item.content);
+                }
+            }
+        }
+    }
+
+    // 7. Custom link tags array (link: [{ rel: "canonical", href: "..." }])
+    if (Array.isArray(m.link)) {
+        for (const item of m.link) {
+            if (item && item.rel && item.href) {
+                setLinkTag(item.rel, item.href);
+            }
+        }
+    }
+
+    // 8. JSON-LD Structured Data
     if (m.structuredData || m.jsonLd) {
         setStructuredData(m.structuredData || m.jsonLd);
     } else {
@@ -100,7 +122,8 @@ function setStructuredData(data) {
         el.setAttribute("type", "application/ld+json");
         document.head.appendChild(el);
     }
-    el.textContent = typeof data === "string" ? data : JSON.stringify(data);
+    const jsonString = typeof data === "string" ? data : JSON.stringify(data);
+    el.textContent = jsonString;
 }
 
 function removeStructuredData() {
