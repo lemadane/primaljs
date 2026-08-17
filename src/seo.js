@@ -17,9 +17,7 @@ export function head(meta = {}) {
         document.title = m.title;
         setMetaTag("property", "og:title", m.title);
     } else {
-        if (initialTitle) {
-            document.title = initialTitle;
-        }
+        document.title = initialTitle;
         removeMetaTag("property", "og:title");
     }
 

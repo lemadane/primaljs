@@ -118,4 +118,81 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
 
         handle.dispose();
     });
+
+    it("discards stale async navigation rejections if newer navigation arrives", async () => {
+        let reportedError = null;
+
+        const router = createRouter({
+            onError(err) {
+                reportedError = err;
+            },
+            routes: [
+                {
+                    path: "/rejecting-slow",
+                    async beforeEnter() {
+                        await new Promise(r => setTimeout(r, 80));
+                        throw new Error("Stale navigation rejection error");
+                    },
+                    component: () => html`<h2>Slow Fail</h2>`
+                },
+                {
+                    path: "/fast-success",
+                    component: () => html`<h2 class="fast-success-page">Fast Success Page</h2>`
+                }
+            ]
+        });
+
+        const app = createApp({ router });
+        const handle = app.mount("#app");
+
+        // Start slow navigation that will reject
+        const slowPromise = router.resolveRoute("/rejecting-slow");
+
+        // Immediately navigate to fast-success
+        await router.resolveRoute("/fast-success");
+
+        assert.equal(document.querySelector(".fast-success-page").textContent, "Fast Success Page");
+
+        // Wait for slow rejection to settle
+        await slowPromise;
+
+        // Verify stale rejection did NOT report to onError handler
+        assert.equal(reportedError, null);
+
+        handle.dispose();
+    });
+
+    it("resets and clears SEO metadata when navigating from a route with meta to a route without meta", async () => {
+        const router = createRouter({
+            routes: [
+                {
+                    path: "/product",
+                    meta: {
+                        title: "Product Title",
+                        description: "Product Description"
+                    },
+                    component: () => html`<h2>Product</h2>`
+                },
+                {
+                    path: "/about",
+                    component: () => html`<h2>About</h2>`
+                }
+            ]
+        });
+
+        // 1. Navigate to route with meta
+        await router.resolveRoute("/product");
+        assert.equal(document.title, "Product Title");
+        assert.equal(document.querySelector('meta[name="description"]').getAttribute("content"), "Product Description");
+
+        // 2. Navigate to route without meta -> stale meta must be cleared!
+        await router.resolveRoute("/about");
+        assert.equal(document.title, "");
+        assert.equal(document.querySelector('meta[name="description"]'), null);
+
+        // 3. Navigate to unmatched route -> meta must remain cleared
+        await router.resolveRoute("/non-existent");
+        assert.equal(document.title, "");
+        assert.equal(document.querySelector('meta[name="description"]'), null);
+    });
 });

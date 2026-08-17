@@ -205,6 +205,7 @@ export class Router {
                         meta: null
                     };
                 });
+                head(null);
                 return;
             }
 
@@ -287,10 +288,11 @@ export class Router {
                 };
             });
 
-            if (leafMeta) {
-                head(leafMeta);
-            }
+            head(leafMeta);
         } catch (err) {
+            if (navigationToken !== globalNavigationId) {
+                return;
+            }
             if (typeof this.onError === "function") {
                 this.onError(err);
             } else {
