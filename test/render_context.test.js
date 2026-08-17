@@ -1,7 +1,7 @@
 import "./setup.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { html, signal, mount, onDestroy, onMount, register } from "../src/index.js";
+import { html, signal, mount, onDestroy, onMount, register, Try, Catch } from "../src/index.js";
 import { Render } from "../src/render.js";
 
 describe("PrimalJS <Render> Context Disposal & Parenting", () => {
@@ -73,5 +73,47 @@ describe("PrimalJS <Render> Context Disposal & Parenting", () => {
 
         assert.equal(document.querySelector(".child"), null);
         assert.equal(compDestroyed, true);
+    });
+
+    it("inherits <Try> error boundary across reactive component switches", () => {
+        let errorCaught = null;
+
+        function NormalComp() {
+            return html`<div class="normal">Normal Component</div>`;
+        }
+
+        function FaultyComp() {
+            onMount(() => {
+                throw new Error("Switched Component Mount Error");
+            });
+            return html`<div class="faulty">Faulty Component</div>`;
+        }
+
+        register(NormalComp, FaultyComp, Render, Try, Catch);
+
+        const activeComp = signal(NormalComp);
+
+        function App() {
+            return html`
+                <Try>
+                    <Render component=${activeComp} />
+                    <Catch>${(err) => { errorCaught = err; return html`<div class="error">Error: ${err.message}</div>`; }}</Catch>
+                </Try>
+            `;
+        }
+
+        const handle = mount(App, "#app");
+
+        assert.equal(document.querySelector(".normal").textContent, "Normal Component");
+        assert.equal(errorCaught, null);
+
+        // Switch reactively to FaultyComp inside <Try>
+        activeComp.value = FaultyComp;
+
+        assert.ok(errorCaught);
+        assert.equal(errorCaught.message, "Switched Component Mount Error");
+        assert.equal(document.querySelector(".error").textContent, "Error: Switched Component Mount Error");
+
+        handle.dispose();
     });
 });

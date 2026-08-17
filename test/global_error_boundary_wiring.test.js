@@ -130,4 +130,71 @@ describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
 
         app.dispose();
     });
+
+    it("wires createApp.onError into initial root component execution failure during mount", () => {
+        let reportedError = null;
+        let reportedContext = null;
+
+        function CrashyRoot() {
+            throw new Error("Root component initial render crash!");
+        }
+
+        register(CrashyRoot);
+
+        const app = createApp({
+            root: CrashyRoot,
+            onError(err, ctx) {
+                reportedError = err;
+                reportedContext = ctx;
+            }
+        });
+
+        app.mount("#app");
+
+        assert.ok(reportedError);
+        assert.equal(reportedError.message, "Root component initial render crash!");
+        assert.equal(reportedContext.type, "mount");
+
+        app.dispose();
+    });
+
+    it("isolates onError handlers across independent createApp instances", () => {
+        let app1Error = null;
+        let app2Error = null;
+
+        function Comp1() {
+            onMount(() => { throw new Error("App 1 Error"); });
+            return html`<div>App 1</div>`;
+        }
+
+        function Comp2() {
+            onMount(() => { throw new Error("App 2 Error"); });
+            return html`<div>App 2</div>`;
+        }
+
+        register(Comp1, Comp2);
+
+        const app1 = createApp({
+            root: Comp1,
+            onError(err) { app1Error = err; }
+        });
+
+        const app2 = createApp({
+            root: Comp2,
+            onError(err) { app2Error = err; }
+        });
+
+        app1.mount("#app");
+        assert.ok(app1Error);
+        assert.equal(app1Error.message, "App 1 Error");
+        assert.equal(app2Error, null);
+
+        app1.dispose();
+
+        app2.mount("#app");
+        assert.ok(app2Error);
+        assert.equal(app2Error.message, "App 2 Error");
+
+        app2.dispose();
+    });
 });

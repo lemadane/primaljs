@@ -27,21 +27,23 @@ describe("PrimalJS PWA Engine Hardening & Cleanup", () => {
         assert.equal(registeredSw, "./custom-sw.js");
     });
 
-    it("unregisters PrimalJS service workers and clears PrimalJS cache stores safely", async () => {
-        let unregisteredCount = 0;
+    it("unregisters targeted service workers using exact URL/scope matching without removing independent worker scripts", async () => {
+        const unregisteredScripts = [];
 
         const fakeRegistrations = [
             {
-                active: { scriptURL: "http://localhost/primal-sw.js" },
+                active: { scriptURL: "http://localhost/sw.js" },
+                scope: "http://localhost/",
                 unregister() {
-                    unregisteredCount++;
+                    unregisteredScripts.push(this.active.scriptURL);
                     return Promise.resolve(true);
                 }
             },
             {
-                active: { scriptURL: "http://localhost/other-sw.js" },
+                active: { scriptURL: "http://localhost/my-primal-data-worker.js" },
+                scope: "http://localhost/data/",
                 unregister() {
-                    unregisteredCount++;
+                    unregisteredScripts.push(this.active.scriptURL);
                     return Promise.resolve(true);
                 }
             }
@@ -64,9 +66,10 @@ describe("PrimalJS PWA Engine Hardening & Cleanup", () => {
             }
         };
 
-        await unregisterServiceWorkers("./primal-sw.js");
+        // Target sw.js specifically
+        await unregisterServiceWorkers("./sw.js");
 
-        assert.equal(unregisteredCount, 1);
+        assert.deepEqual(unregisteredScripts, ["http://localhost/sw.js"]);
         assert.deepEqual(deletedCacheKeys, ["primal-v1", "primaljs-cache"]);
     });
 });

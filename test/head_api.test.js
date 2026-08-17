@@ -40,4 +40,29 @@ describe("PrimalJS head() Metadata Management Engine API Compatibility", () => {
         assert.equal(document.querySelector('meta[property="og:site_name"]').getAttribute("content"), "PrimalJS Showcase");
         assert.equal(document.querySelector('link[rel="alternate"]').getAttribute("href"), "https://example.com/en");
     });
+
+    it("tracks and cleans up stale custom meta and link tags across head() calls", () => {
+        // Page 1 sets custom keywords meta and alternate link
+        head({
+            title: "Page 1",
+            meta: [
+                { name: "keywords", content: "java javascript" }
+            ],
+            link: [
+                { rel: "alternate", href: "https://example.com/fr", hreflang: "fr" }
+            ]
+        });
+
+        assert.equal(document.querySelector('meta[name="keywords"]').getAttribute("content"), "java javascript");
+        assert.equal(document.querySelector('link[rel="alternate"][hreflang="fr"]').getAttribute("href"), "https://example.com/fr");
+
+        // Page 2 sets new title without keywords or alternate link
+        head({
+            title: "Page 2"
+        });
+
+        assert.equal(document.title, "Page 2");
+        assert.equal(document.querySelector('meta[name="keywords"]'), null);
+        assert.equal(document.querySelector('link[rel="alternate"][hreflang="fr"]'), null);
+    });
 });

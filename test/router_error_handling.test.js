@@ -1,7 +1,10 @@
 import "./setup.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createRouter, createApp, html, register } from "../src/index.js";
+import { createRouter, lazy } from "../src/router.js";
+import { html } from "../src/html.js";
+import { createApp } from "../src/app.js";
+import { register } from "../src/registry.js";
 
 describe("PrimalJS Router Promise & Error Handling Hardening", () => {
     it("delegates beforeEnter guard exceptions to custom onError handler", async () => {
@@ -28,7 +31,7 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
         assert.equal(caughtError.message, "Guard unauthorized access error");
     });
 
-    it("resolves async dynamic component loaders (e.g. component: () => import(...))", async () => {
+    it("resolves async dynamic component loaders (e.g. component: lazy(() => import(...)))", async () => {
         function DashboardPage() {
             return html`<div class="dashboard-page">Dashboard Content Loaded</div>`;
         }
@@ -39,7 +42,7 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
             routes: [
                 {
                     path: "/dashboard",
-                    component: () => Promise.resolve({ default: DashboardPage })
+                    component: lazy(() => Promise.resolve({ default: DashboardPage }))
                 }
             ]
         });
@@ -64,7 +67,7 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
             routes: [
                 {
                     path: "/failed-load",
-                    component: () => Promise.reject(new Error("Network bundle fetch failure"))
+                    component: lazy(() => Promise.reject(new Error("Network bundle fetch failure")))
                 }
             ]
         });
@@ -78,11 +81,6 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
     it("discards stale async navigation resolutions if newer navigation arrives", async () => {
         let slowGuardResolved = false;
 
-        function SlowPage() { return html`<div class="slow">Slow Page</div>`; }
-        function FastPage() { return html`<div class="fast">Fast Page</div>`; }
-
-        register(SlowPage, FastPage);
-
         const router = createRouter({
             routes: [
                 {
@@ -90,12 +88,13 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
                     async beforeEnter() {
                         await new Promise(r => setTimeout(r, 100));
                         slowGuardResolved = true;
+                        return true;
                     },
-                    component: SlowPage
+                    component: () => html`<h2>Slow Page</h2>`
                 },
                 {
                     path: "/fast",
-                    component: FastPage
+                    component: () => html`<h2 class="fast-page">Fast Page</h2>`
                 }
             ]
         });
@@ -103,16 +102,19 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
         const app = createApp({ router });
         const handle = app.mount("#app");
 
-        // 1. Trigger slow navigation
-        const p1 = router.resolveRoute("/slow");
-        // 2. Immediately trigger fast navigation before p1 finishes
-        const p2 = router.resolveRoute("/fast");
+        // Start slow navigation
+        const slowPromise = router.resolveRoute("/slow");
 
-        await Promise.all([p1, p2]);
+        // Immediately trigger fast navigation
+        await router.resolveRoute("/fast");
 
-        // Verify active page is FastPage and not overwritten by SlowPage
-        assert.equal(document.querySelector(".fast").textContent, "Fast Page");
-        assert.equal(document.querySelector(".slow"), null);
+        assert.equal(document.querySelector(".fast-page").textContent, "Fast Page");
+
+        // Wait for slow navigation to complete
+        await slowPromise;
+
+        // Ensure fast page was NOT overwritten by late-resolving slow navigation
+        assert.equal(document.querySelector(".fast-page").textContent, "Fast Page");
 
         handle.dispose();
     });

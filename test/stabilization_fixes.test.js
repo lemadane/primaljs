@@ -129,8 +129,8 @@ describe("PrimalJS 0.1.0-alpha.1 Stabilization & Regression Fixes", () => {
         unregisterServiceWorkers("./sw.js");
         await new Promise(r => setTimeout(r, 10));
 
-        // Only primal/sw.js workers unregistered (2/3), third-party untouched
-        assert.equal(unregisteredCount, 2);
+        // Only target ./sw.js worker unregistered (1/3), third-party untouched
+        assert.equal(unregisteredCount, 1);
         // Only primal- and primaljs- caches deleted
         assert.deepEqual(deletedCaches, ["primal-cache-v1", "primaljs-app"]);
     });

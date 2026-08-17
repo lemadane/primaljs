@@ -596,6 +596,8 @@ function setElementAttribute(el, attr, val) {
  */
 function instantiateComponentNode(placeholderEl, componentFn, templateValues, parentCtx, capitalTags = new Set()) {
     if (!placeholderEl || !placeholderEl.parentNode || !placeholderEl.attributes) return;
+    if (placeholderEl._primalInstantiated) return;
+    placeholderEl._primalInstantiated = true;
 
     const parent = placeholderEl.parentNode;
     const props = {};

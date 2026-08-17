@@ -48,6 +48,7 @@ export {
     navigate,
     RouteOutlet,
     Router,
+    lazy,
     head,
     activate,
     setupPwa,

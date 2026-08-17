@@ -3,7 +3,7 @@
  * Dynamically mounts an already-available component in an owned real-DOM range without parent rerenders.
  */
 
-import { isSignal, effect } from "./signal.js";
+import { isSignal, effect, untrack } from "./signal.js";
 import {
     ComponentContext,
     pushContext,
@@ -78,6 +78,15 @@ export function Render(props) {
 
         activeCompFn = compFn;
         activeCompCtx = new ComponentContext(compFn.name || "RenderedComponent");
+        if (ctx) {
+            activeCompCtx.parent = ctx;
+            if (!ctx.children.includes(activeCompCtx)) {
+                ctx.children.push(activeCompCtx);
+            }
+            if (ctx.tryBoundary) activeCompCtx.tryBoundary = ctx.tryBoundary;
+            if (ctx.templateValues) activeCompCtx.templateValues = ctx.templateValues;
+            if (ctx.capitalTags) activeCompCtx.capitalTags = ctx.capitalTags;
+        }
 
         const forwardedProps = {};
         if (props) {
@@ -93,8 +102,10 @@ export function Render(props) {
         pushContext(activeCompCtx);
         let compDOM;
         try {
-            const compResult = compFn(forwardedProps);
-            compDOM = convertToDOMNode(compResult, activeCompCtx);
+            compDOM = untrack(() => {
+                const compResult = compFn(forwardedProps);
+                return convertToDOMNode(compResult, activeCompCtx);
+            });
         } finally {
             popContext();
         }

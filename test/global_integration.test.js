@@ -127,6 +127,7 @@ describe("PrimalJS Complete Framework Core & Integration Suite", () => {
     });
 
     it("4. SPA Router navigates, matches params, updates route signals, and updates SEO head", () => {
+        window.history.replaceState({}, "", "/");
         function HomeRoute() { return html`<h1>Home</h1>`; }
         function UserRoute() { return html`<h1>User Profile</h1>`; }
 

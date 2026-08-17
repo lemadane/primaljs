@@ -3,12 +3,14 @@
  * Built directly on native browser History API, Signals, and Fine-Grained Layout DOM Preservation.
  */
 
-import { signal, computed } from "./signal.js";
+import { signal, computed, batch } from "./signal.js";
 import { html } from "./html.js";
 import { Render } from "./render.js";
 import { head } from "./seo.js";
+import { Delay } from "./control_flow.js";
 import { getCurrentContext, pushContext, popContext } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";
+import { register } from "./registry.js";
 
 const currentRouteSignal = signal({
     path: "/",
@@ -20,6 +22,51 @@ const currentRouteSignal = signal({
 });
 
 let globalNavigationId = 0;
+
+export function lazy(factory) {
+    let cachedComponent = null;
+    let pendingPromise = null;
+
+    const LazyWrapper = function LazyWrapper(props) {
+        if (cachedComponent) {
+            return typeof cachedComponent === "function" ? cachedComponent(props) : cachedComponent;
+        }
+        return Delay({
+            task: () => {
+                if (!pendingPromise) {
+                    pendingPromise = Promise.resolve().then(() => factory()).then(mod => {
+                        cachedComponent = (mod && mod.default) || mod;
+                        return mod;
+                    });
+                }
+                return pendingPromise;
+            },
+            children: [
+                (mod) => {
+                    const Comp = (mod && mod.default) || mod;
+                    return typeof Comp === "function" ? Comp(props) : Comp;
+                }
+            ]
+        });
+    };
+
+    LazyWrapper.__isLazy = true;
+    LazyWrapper.factory = factory;
+    LazyWrapper.resolve = async () => {
+        if (!cachedComponent) {
+            if (!pendingPromise) {
+                pendingPromise = Promise.resolve().then(() => factory()).then(mod => {
+                    cachedComponent = (mod && mod.default) || mod;
+                    return mod;
+                });
+            }
+            await pendingPromise;
+        }
+        return cachedComponent;
+    };
+
+    return LazyWrapper;
+}
 
 function matchSegment(pattern, segment) {
     if (pattern === "*") return { [segment]: segment };
@@ -128,6 +175,9 @@ export class Router {
         if (typeof window !== "undefined") {
             window.removeEventListener("popstate", this.handlePopState);
         }
+        if (globalRouterInstance === this) {
+            globalRouterInstance = null;
+        }
     }
 
     async resolveRoute(path, search = "", hash = "", navigationToken = ++globalNavigationId) {
@@ -141,18 +191,20 @@ export class Router {
             const matchedLayers = matchRouteTree(this.routes, path);
 
             if (matchedLayers.length === 0) {
-                this.activeLayers.value = [];
-                this.activeParams.value = {};
-                this.activeQuery.value = query;
-                this.activeHash.value = hash;
-                currentRouteSignal.value = {
-                    path,
-                    params: {},
-                    query,
-                    hash,
-                    component: null,
-                    meta: null
-                };
+                batch(() => {
+                    this.activeLayers.value = [];
+                    this.activeParams.value = {};
+                    this.activeQuery.value = query;
+                    this.activeHash.value = hash;
+                    currentRouteSignal.value = {
+                        path,
+                        params: {},
+                        query,
+                        hash,
+                        component: null,
+                        meta: null
+                    };
+                });
                 return;
             }
 
@@ -192,156 +244,128 @@ export class Router {
                 }
             }
 
-            // Resolve dynamic component functions / ES module loaders
+            // Resolve explicit lazy route components / load options without executing normal component functions
             for (const layer of matchedLayers) {
-                if (typeof layer.component === "function") {
-                    if (layer.component.kind === undefined && !layer.component.__isComponent) {
-                        try {
-                            const res = layer.component();
-                            if (res && typeof res.then === "function") {
-                                const mod = await res;
-                                if (navigationToken !== globalNavigationId) {
-                                    return;
-                                }
-                                layer.component = (mod && mod.default) ? mod.default : mod;
-                            }
-                        } catch (compErr) {
-                            if (navigationToken !== globalNavigationId) return;
-                            throw compErr;
-                        }
+                if (layer.component && layer.component.__isLazy) {
+                    try {
+                        const resolved = await layer.component.resolve();
+                        if (navigationToken !== globalNavigationId) return;
+                        layer.component = resolved;
+                    } catch (compErr) {
+                        if (navigationToken !== globalNavigationId) return;
+                        throw compErr;
+                    }
+                } else if (typeof layer.route.load === "function") {
+                    try {
+                        const res = layer.route.load();
+                        const mod = res && typeof res.then === "function" ? await res : res;
+                        if (navigationToken !== globalNavigationId) return;
+                        layer.component = (mod && mod.default) || mod;
+                    } catch (compErr) {
+                        if (navigationToken !== globalNavigationId) return;
+                        throw compErr;
                     }
                 }
             }
 
             const leafMeta = leafLayer.meta || (matchedLayers[0] && matchedLayers[0].meta) || null;
 
-            this.activeLayers.value = matchedLayers;
-            this.activeParams.value = leafLayer.params;
-            this.activeQuery.value = query;
-            this.activeHash.value = hash;
-            this.activeMeta.value = leafMeta;
+            batch(() => {
+                this.activeLayers.value = matchedLayers;
+                this.activeParams.value = leafLayer.params;
+                this.activeQuery.value = query;
+                this.activeHash.value = hash;
+                this.activeMeta.value = leafMeta;
 
-            currentRouteSignal.value = {
-                path,
-                params: leafLayer.params,
-                query,
-                hash,
-                component: leafLayer.component,
-                meta: leafMeta
-            };
+                currentRouteSignal.value = {
+                    path,
+                    params: leafLayer.params,
+                    query,
+                    hash,
+                    component: leafLayer.component,
+                    meta: leafMeta
+                };
+            });
 
-            head(leafMeta);
-
-            if (typeof window !== "undefined") {
-                if (hash) {
-                    const targetId = hash.slice(1);
-                    setTimeout(() => {
-                        const targetEl = document.getElementById(targetId) || document.querySelector(`[name="${targetId}"]`);
-                        if (targetEl && typeof targetEl.scrollIntoView === "function") {
-                            try { targetEl.scrollIntoView(); } catch (_) {}
-                        }
-                    }, 0);
-                } else {
-                    try { window.scrollTo(0, 0); } catch (_) {}
-                }
-
-                if (leafLayer.route.focus) {
-                    setTimeout(() => {
-                        const focusEl = document.querySelector(leafLayer.route.focus);
-                        if (focusEl && typeof focusEl.focus === "function") {
-                            try { focusEl.focus(); } catch (_) {}
-                        }
-                    }, 0);
-                }
+            if (leafMeta) {
+                head(leafMeta);
             }
         } catch (err) {
-            if (navigationToken !== globalNavigationId) return;
             if (typeof this.onError === "function") {
-                this.onError(err, { path, search, hash });
+                this.onError(err);
             } else {
-                reportGlobalError(err, { type: "router", path, search, hash });
+                reportGlobalError(err, { type: "router", path });
             }
         }
+    }
+
+    handlePopState() {
+        this.resolveRoute(window.location.pathname, window.location.search, window.location.hash);
     }
 
     navigate(to, options = {}) {
         if (typeof window === "undefined") return;
 
-        const navToken = ++globalNavigationId;
-        const [pathAndSearch, hash] = to.split("#");
-        const [path, search] = pathAndSearch.split("?");
-        const searchStr = search ? `?${search}` : "";
-        const hashStr = hash ? `#${hash}` : "";
+        const targetUrl = new URL(to, window.location.origin);
+        const nextPath = targetUrl.pathname;
+        const nextSearch = targetUrl.search;
+        const nextHash = targetUrl.hash;
 
         if (options.replace) {
-            window.history.replaceState({}, "", `${path}${searchStr}${hashStr}`);
+            window.history.replaceState({}, "", targetUrl.href);
         } else {
-            window.history.pushState({}, "", `${path}${searchStr}${hashStr}`);
+            window.history.pushState({}, "", targetUrl.href);
         }
 
-        this.resolveRoute(path, searchStr, hashStr, navToken);
+        this.resolveRoute(nextPath, nextSearch, nextHash);
     }
 
-    handlePopState() {
-        if (typeof window !== "undefined") {
-            const navToken = ++globalNavigationId;
-            this.resolveRoute(window.location.pathname, window.location.search, window.location.hash, navToken);
-        }
-    }
+    link(props) {
+        const href = props.href || "#";
+        const replace = props.replace || false;
+        const children = props.children || [];
 
-    link(event) {
-        if (!event || event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
-            return;
-        }
-        const target = event.currentTarget || event.target;
-        if (target && target.href) {
-            const url = new URL(target.href, window.location.origin);
-            if (url.origin === window.location.origin) {
-                event.preventDefault();
-                this.navigate(`${url.pathname}${url.search}${url.hash}`);
+        const handleClick = (e) => {
+            if (e.defaultPrevented || e.button !== 0 || e.metaKey || e.altKey || e.ctrlKey || e.shiftKey) {
+                return;
             }
-        }
+            e.preventDefault();
+            this.navigate(href, { replace });
+        };
+
+        return html`<a href=${href} onclick=${handleClick}>${children}</a>`;
     }
 
-    RouterView() {
-        const activeLayers = this.activeLayers;
-        const comp = computed(() => {
-            const layers = activeLayers.value;
-            return layers && layers.length > 0 ? layers[0].component : null;
-        });
-
-        const ctx = getCurrentContext();
-        if (ctx) {
-            ctx.outletDepth = 0;
-        }
-
-        return html`<Render component=${comp} />`;
+    RouterView(props = {}) {
+        const depth = props.depth || 0;
+        return html`<RouteOutlet depth=${depth} />`;
     }
 }
 
-/**
- * Declarative <RouteOutlet> Component for Nested Route Subtrees
- */
-export function RouteOutlet(props) {
+export function RouteOutlet(props = {}) {
     const ctx = getCurrentContext();
-    let currentDepth = 1;
-    if (ctx) {
-        let p = ctx;
+    let depth = props.depth;
+    if (depth === undefined) {
+        let count = 0;
+        let p = ctx ? ctx.parent : null;
         while (p) {
-            if (p.outletDepth !== undefined) {
-                currentDepth = p.outletDepth + 1;
-                break;
+            if (p.isRouteOutlet) {
+                count++;
             }
             p = p.parent;
         }
-        ctx.outletDepth = currentDepth;
+        depth = count;
+    }
+
+    if (ctx) {
+        ctx.isRouteOutlet = true;
     }
 
     const currentRouter = globalRouterInstance;
     const comp = computed(() => {
         if (!currentRouter) return null;
         const layers = currentRouter.activeLayers.value;
-        return layers && layers.length > currentDepth ? layers[currentDepth].component : null;
+        return layers && layers.length > depth ? layers[depth].component : null;
     });
 
     return html`<Render component=${comp} />`;
@@ -352,6 +376,16 @@ let globalRouterInstance = null;
 export function createRouter(options) {
     const router = new Router(options);
     globalRouterInstance = router;
+    batch(() => {
+        currentRouteSignal.value = {
+            path: "/",
+            params: {},
+            query: new URLSearchParams(),
+            hash: "",
+            component: null,
+            meta: null
+        };
+    });
     router.init();
     return router;
 }
@@ -365,3 +399,6 @@ export function navigate(to, options) {
         globalRouterInstance.navigate(to, options);
     }
 }
+
+register(RouteOutlet);
+register(Render);

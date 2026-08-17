@@ -27,8 +27,12 @@ export function getComponent(name) {
 }
 
 export function clearRegistry() {
+    const savedRouteOutlet = registry.get("RouteOutlet");
     registry.clear();
     registerDefaultComponents();
+    if (savedRouteOutlet) {
+        register(savedRouteOutlet);
+    }
 }
 
 function registerDefaultComponents() {

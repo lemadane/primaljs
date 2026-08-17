@@ -6,7 +6,7 @@ import { html } from "../src/html.js";
 import { mount } from "../src/mount.js";
 import { createRouter, RouteOutlet, useRoute, navigate } from "../src/router.js";
 import { register } from "../src/registry.js";
-import { onMount } from "../src/lifecycle.js";
+import { onMount, getCurrentContext } from "../src/lifecycle.js";
 
 function DashboardLayout() {
     return html`
@@ -49,6 +49,8 @@ describe("PrimalJS SPA Router Lifecycle & Nested Layouts", () => {
             `;
         }
         register(Layout);
+
+        window.history.replaceState({}, "", "/");
 
         const router = createRouter({
             routes: [

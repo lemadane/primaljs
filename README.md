@@ -2,7 +2,7 @@
 
 > **The Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Virtual DOM, No Compiler.**
 
-PrimalJS is a lightweight, production-ready Single Page Application (SPA) framework built directly on modern browser APIs. Back to the fundamentals of web development — **JavaScript stays JavaScript**.
+PrimalJS is a lightweight Single Page Application (SPA) framework currently in beta, designed for production-oriented applications built directly on modern browser APIs. Back to the fundamentals of web development — **JavaScript stays JavaScript**.
 
 ---
 
@@ -603,30 +603,32 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 # Run unit & integration test suite (134/134 passing)
 npm run test:unit
 
-# Run cross-browser E2E engine suite (Chromium, Firefox, Safari/WebKit, Edge, Android)
+# Run cross-browser suite targeting Chromium, Firefox, WebKit, Edge, and mobile Chromium
 npm run test:e2e:cross
 
 # Run full test suite
 npm run test:e2e
 ```
 
-### Repeated Full Matrix Verification
+### Full Matrix Verification Status
+
+GitHub Actions CI installs Playwright binaries (`npx playwright install --with-deps chromium firefox webkit`) to verify active browser engines. In local environments lacking specific system binaries (such as Edge on Linux), uninstalled browser targets are gracefully skipped while active installed engines pass.
 
 ```text
 === MATRIX REPEATED PASS 1 ===
-ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
 ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 2 ===
-ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
 ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 3 ===
-ℹ tests 134 unit | pass 134 | fail 0 | 0 errors
+ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
 ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped
+ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
 ```
 
 ---

@@ -9,7 +9,13 @@ dom.window.scrollTo = () => {};
 
 globalThis.window = dom.window;
 globalThis.document = dom.window.document;
-globalThis.navigator = dom.window.navigator;
+
+Object.defineProperty(globalThis, "navigator", {
+    value: dom.window.navigator,
+    configurable: true,
+    writable: true
+});
+
 globalThis.Node = dom.window.Node;
 globalThis.NodeFilter = dom.window.NodeFilter;
 globalThis.HTMLElement = dom.window.HTMLElement;
@@ -25,4 +31,9 @@ globalThis.AbortSignal = globalThis.AbortSignal || dom.window.AbortSignal;
 
 beforeEach(() => {
     document.body.innerHTML = '<div id="app"></div>';
+    if (globalThis.window && globalThis.window.history) {
+        try {
+            globalThis.window.history.replaceState({}, "", "http://localhost/");
+        } catch (_) {}
+    }
 });

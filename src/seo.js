@@ -4,6 +4,8 @@
  */
 
 let initialTitle = typeof document !== "undefined" ? document.title : "";
+let trackedCustomMetaKeys = new Set();
+let trackedCustomLinkKeys = new Set();
 
 export function head(meta = {}) {
     if (typeof document === "undefined") return;
@@ -52,6 +54,7 @@ export function head(meta = {}) {
     }
 
     // 6. Custom meta tags array (meta: [{ name: "...", content: "..." }, { property: "...", content: "..." }])
+    const newCustomMetaKeys = new Set();
     if (Array.isArray(m.meta)) {
         for (const item of m.meta) {
             if (item) {
@@ -59,19 +62,39 @@ export function head(meta = {}) {
                 const keyVal = item.name || item.property || item.httpEquiv;
                 if (keyAttr && keyVal && item.content !== undefined) {
                     setMetaTag(keyAttr, keyVal, item.content);
+                    newCustomMetaKeys.add(`${keyAttr}:${keyVal}`);
                 }
             }
         }
     }
+    for (const key of trackedCustomMetaKeys) {
+        if (!newCustomMetaKeys.has(key)) {
+            const colonIdx = key.indexOf(":");
+            const keyAttr = key.slice(0, colonIdx);
+            const keyVal = key.slice(colonIdx + 1);
+            removeMetaTag(keyAttr, keyVal);
+        }
+    }
+    trackedCustomMetaKeys = newCustomMetaKeys;
 
-    // 7. Custom link tags array (link: [{ rel: "canonical", href: "..." }])
+    // 7. Custom link tags array (link: [{ rel: "...", href: "..." }])
+    const newCustomLinkKeys = new Set();
     if (Array.isArray(m.link)) {
         for (const item of m.link) {
             if (item && item.rel && item.href) {
-                setLinkTag(item.rel, item.href);
+                const keyVal = item.hreflang ? `${item.rel}:${item.hreflang}` : item.rel;
+                setLinkTag(item.rel, item.href, item.hreflang);
+                newCustomLinkKeys.add(keyVal);
             }
         }
     }
+    for (const key of trackedCustomLinkKeys) {
+        if (!newCustomLinkKeys.has(key)) {
+            const parts = key.split(":");
+            removeLinkTag(parts[0], parts[1]);
+        }
+    }
+    trackedCustomLinkKeys = newCustomLinkKeys;
 
     // 8. JSON-LD Structured Data
     if (m.structuredData || m.jsonLd) {
@@ -98,18 +121,27 @@ function removeMetaTag(keyAttr, keyVal) {
     }
 }
 
-function setLinkTag(relVal, hrefVal) {
-    let el = document.querySelector(`link[rel="${relVal}"]`);
+function setLinkTag(relVal, hrefVal, hreflangVal) {
+    let selector = `link[rel="${relVal}"]`;
+    if (hreflangVal) {
+        selector += `[hreflang="${hreflangVal}"]`;
+    }
+    let el = document.querySelector(selector);
     if (!el) {
         el = document.createElement("link");
         el.setAttribute("rel", relVal);
+        if (hreflangVal) el.setAttribute("hreflang", hreflangVal);
         document.head.appendChild(el);
     }
     el.setAttribute("href", hrefVal);
 }
 
-function removeLinkTag(relVal) {
-    const el = document.querySelector(`link[rel="${relVal}"]`);
+function removeLinkTag(relVal, hreflangVal) {
+    let selector = `link[rel="${relVal}"]`;
+    if (hreflangVal) {
+        selector += `[hreflang="${hreflangVal}"]`;
+    }
+    const el = document.querySelector(selector);
     if (el && el.parentNode) {
         el.parentNode.removeChild(el);
     }

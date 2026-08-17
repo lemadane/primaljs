@@ -65,13 +65,11 @@ export function setupPwa(options = {}) {
 }
 
 /**
- * Safely unregisters PrimalJS-owned service workers and clears PrimalJS cache stores.
+ * Safely unregisters service workers by exact target URL, scope, or file path, and clears PrimalJS cache stores.
  * Returns a Promise that resolves when all cleanup tasks finish.
  */
 export async function unregisterServiceWorkers(targetPath = "") {
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) return;
-
-    const targetName = targetPath ? targetPath.replace("./", "") : "";
 
     try {
         const registrations = await navigator.serviceWorker.getRegistrations();
@@ -81,15 +79,29 @@ export async function unregisterServiceWorkers(targetPath = "") {
                 || (reg.waiting && reg.waiting.scriptURL)
                 || "";
 
-            let fileName = scriptURL;
-            try {
-                fileName = new URL(scriptURL).pathname.split("/").pop();
-            } catch (_) {}
+            let isTargetWorker = false;
 
-            const isPrimalWorker = fileName.includes("primal")
-                || (targetName && fileName === targetName);
+            if (targetPath) {
+                let targetURL = "";
+                let targetFileName = targetPath.replace(/^\.\//, "");
+                try {
+                    targetURL = new URL(targetPath, window.location.origin).href;
+                } catch (_) {}
 
-            if (isPrimalWorker) {
+                let scriptFileName = scriptURL;
+                try {
+                    scriptFileName = new URL(scriptURL).pathname.split("/").pop();
+                } catch (_) {}
+
+                isTargetWorker = (targetURL && scriptURL === targetURL)
+                    || (targetURL && reg.scope === targetURL)
+                    || (targetFileName && scriptFileName === targetFileName);
+            } else {
+                // Without an explicit targetPath, match workers owned under the current window origin
+                isTargetWorker = typeof window.location !== "undefined" && scriptURL.startsWith(window.location.origin);
+            }
+
+            if (isTargetWorker) {
                 try {
                     await reg.unregister();
                 } catch (_) {}
