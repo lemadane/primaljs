@@ -39,15 +39,25 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
 ## Core Principles
 
 - **Pure JavaScript**: Standard ES Modules (`.js`) parsed natively by browser engines.
+
 - **Function Components Only**: Clean, predictable function components. No class components, no complex hook rules.
+
 - **Native Tagged-Template Literals**: `html`...`` templates parsed directly using modern browser `<template>` elements.
+
 - **No JSX Compiler**: Write pure JavaScript template strings without Babel, SWC, or compilation steps.
+
 - **No Transpiler Required**: Zero build steps required to run in production or development.
+
 - **No Virtual DOM**: Real DOM nodes created once. Signal updates mutate target text nodes and attributes directly.
+
 - **No React-Style Reconciliation**: Eliminates expensive tree diffing algorithms entirely.
+
 - **Single Component Execution (`executions === 1`)**: Component functions execute **exactly once** on initial mount. Routine state updates never re-run component functions.
+
 - **Fine-Grained DOM Updates**: Signal writes pinpoint and update exact text nodes and element attributes.
+
 - **Predictable Lifecycle & Cleanup**: Automatic disposal of event listeners, effect subscriptions, and DOM subtrees (`onMount`, `onDestroy`, `{ dispose }`).
+
 - **SEO & Server Agnostic**: Serve static files from Nginx, Apache, Caddy, Go, Rust, Python, PHP, or CDNs.
 
 ---
