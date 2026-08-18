@@ -1,10 +1,9 @@
 import "./setup.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { html, signal, mount, onDestroy, onMount, register, Try, Catch } from "../src/index.js";
-import { Render } from "../src/render.js";
+import { html, signal, mount, onDestroy, onMount, register, Try, Catch, Mount } from "../src/index.js";
 
-describe("PrimalJS <Render> Context Disposal & Parenting", () => {
+describe("PrimalJS <Mount> Context Disposal & Parenting", () => {
     it("disposes previous component context and fires onDestroy when switching components", () => {
         let comp1Destroyed = false;
         let comp2Mounted = false;
@@ -23,12 +22,12 @@ describe("PrimalJS <Render> Context Disposal & Parenting", () => {
             return html`<div class="comp2">Component 2</div>`;
         }
 
-        register(Comp1, Comp2, Render);
+        register(Comp1, Comp2, Mount);
 
         const activeComp = signal(Comp1);
 
         function App() {
-            return html`<Render component=${activeComp} />`;
+            return html`<Mount component=${activeComp} />`;
         }
 
         const handle = mount(App, "#app");
@@ -57,10 +56,10 @@ describe("PrimalJS <Render> Context Disposal & Parenting", () => {
             return html`<div class="child">Child Content</div>`;
         }
 
-        register(ChildComp, Render);
+        register(ChildComp, Mount);
 
         function App() {
-            return html`<Render component=${ChildComp} />`;
+            return html`<Mount component=${ChildComp} />`;
         }
 
         const handle = mount(App, "#app");
@@ -89,14 +88,14 @@ describe("PrimalJS <Render> Context Disposal & Parenting", () => {
             return html`<div class="faulty">Faulty Component</div>`;
         }
 
-        register(NormalComp, FaultyComp, Render, Try, Catch);
+        register(NormalComp, FaultyComp, Mount, Try, Catch);
 
         const activeComp = signal(NormalComp);
 
         function App() {
             return html`
                 <Try>
-                    <Render component=${activeComp} />
+                    <Mount component=${activeComp} />
                     <Catch>${(err) => { errorCaught = err; return html`<div class="error">Error: ${err.message}</div>`; }}</Catch>
                 </Try>
             `;

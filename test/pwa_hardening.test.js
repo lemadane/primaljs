@@ -72,4 +72,43 @@ describe("PrimalJS PWA Engine Hardening & Cleanup", () => {
         assert.deepEqual(unregisteredScripts, ["http://localhost/sw.js"]);
         assert.deepEqual(deletedCacheKeys, ["primal-v1", "primaljs-cache"]);
     });
+
+    it("resolves target service worker relative to document href to prevent cross-app sw.js collision", async () => {
+        const unregisteredScripts = [];
+
+        window.history.replaceState({}, "", "http://localhost/app-a/index.html");
+
+        const fakeRegistrations = [
+            {
+                active: { scriptURL: "http://localhost/app-a/sw.js" },
+                scope: "http://localhost/app-a/",
+                unregister() {
+                    unregisteredScripts.push(this.active.scriptURL);
+                    return Promise.resolve(true);
+                }
+            },
+            {
+                active: { scriptURL: "http://localhost/app-b/sw.js" },
+                scope: "http://localhost/app-b/",
+                unregister() {
+                    unregisteredScripts.push(this.active.scriptURL);
+                    return Promise.resolve(true);
+                }
+            }
+        ];
+
+        globalThis.navigator.serviceWorker = {
+            getRegistrations() {
+                return Promise.resolve(fakeRegistrations);
+            }
+        };
+
+        // Cleaning up ./sw.js from http://localhost/app-a/ should target ONLY /app-a/sw.js
+        await unregisterServiceWorkers("./sw.js");
+
+        assert.deepEqual(unregisteredScripts, ["http://localhost/app-a/sw.js"]);
+
+        // Restore original URL
+        window.history.replaceState({}, "", "http://localhost/");
+    });
 });

@@ -5,7 +5,7 @@
 
 import { signal, computed, batch } from "./signal.js";
 import { html } from "./html.js";
-import { Render } from "./render.js";
+import { Mount } from "./mount.js";
 import { head } from "./seo.js";
 import { Delay } from "./control_flow.js";
 import { getCurrentContext, pushContext, popContext } from "./lifecycle.js";
@@ -410,7 +410,7 @@ export function RouteOutlet(props = {}) {
         return RouteWrapper;
     });
 
-    return html`<Render component=${comp} />`;
+    return html`<Mount component=${comp} />`;
 }
 
 let globalRouterInstance = null;
@@ -443,4 +443,4 @@ export function navigate(to, options) {
 }
 
 register(RouteOutlet);
-register(Render);
+register(Mount);

@@ -151,7 +151,7 @@ describe("PrimalJS Cross-Browser E2E Engine Suite (Chromium, Firefox, Safari/Web
                 const userInfo = (await page.locator(".user-info").textContent()).trim();
                 assert.ok(userInfo.includes("User #1 (Lemuel)"));
 
-                // 8. Dynamic Component Switcher Example (<Render>) (examples/render)
+                // 8. Dynamic Component Switcher Example (<Mount>) (examples/render)
                 await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });
                 const profileHeader = (await page.locator(".profile-view h3").textContent()).trim();
                 assert.equal(profileHeader, "Profile Component");

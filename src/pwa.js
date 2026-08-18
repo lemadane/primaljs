@@ -83,22 +83,18 @@ export async function unregisterServiceWorkers(targetPath = "") {
 
             if (targetPath) {
                 let targetURL = "";
-                let targetFileName = targetPath.replace(/^\.\//, "");
                 try {
-                    targetURL = new URL(targetPath, window.location.origin).href;
-                } catch (_) {}
-
-                let scriptFileName = scriptURL;
-                try {
-                    scriptFileName = new URL(scriptURL).pathname.split("/").pop();
+                    targetURL = new URL(targetPath, window.location.href).href;
                 } catch (_) {}
 
                 isTargetWorker = (targetURL && scriptURL === targetURL)
-                    || (targetURL && reg.scope === targetURL)
-                    || (targetFileName && scriptFileName === targetFileName);
+                    || (targetURL && reg.scope === targetURL);
             } else {
-                // Without an explicit targetPath, match workers owned under the current window origin
-                isTargetWorker = typeof window.location !== "undefined" && scriptURL.startsWith(window.location.origin);
+                // Without an explicit targetPath, match workers registered under the current document's scope/path
+                isTargetWorker = typeof window.location !== "undefined" && (
+                    scriptURL.startsWith(window.location.href) ||
+                    (reg.scope && window.location.href.startsWith(reg.scope))
+                );
             }
 
             if (isTargetWorker) {

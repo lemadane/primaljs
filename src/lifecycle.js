@@ -11,9 +11,12 @@ export class ComponentContext extends Owner {
         this.parent = contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
         if (this.parent) {
             this.tryBoundary = this.parent.tryBoundary;
+            this.appOnError = this.parent.appOnError;
             if (!this.parent.children.includes(this)) {
                 this.parent.children.push(this);
             }
+        } else {
+            this.appOnError = null;
         }
         this.templateValues = [];
         this.capitalTags = new Set();

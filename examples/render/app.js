@@ -3,7 +3,7 @@ import {
     signal,
     register,
     mount,
-    Render
+    Mount
 } from "../../primal.js";
 
 let parentExecutions = 0;
@@ -45,7 +45,7 @@ function App() {
 
     return html`
         <main class="card">
-            <h2>PrimalJS Dynamic &lt;Render&gt; Demo</h2>
+            <h2>PrimalJS Dynamic &lt;Mount&gt; Demo</h2>
             <p class="subtitle">Mount components in owned DOM ranges without parent rerenders</p>
 
             <p class="exec-count">Parent Executions: ${parentExecutions}</p>
@@ -65,14 +65,14 @@ function App() {
                 </button>
             </div>
 
-            <!-- Dynamic <Render> component tag forwarding props & children -->
-            <Render component=${activeCompSignal} title=${titleSignal}>
+            <!-- Dynamic <Mount> component tag forwarding props & children -->
+            <Mount component=${activeCompSignal} title=${titleSignal}>
                 <span class="slotted-badge">Slotted Content Forwarded</span>
-            </Render>
+            </Mount>
         </main>
     `;
 }
 
-register(ProfileView, SettingsView, AnalyticsView, App, Render);
+register(ProfileView, SettingsView, AnalyticsView, App, Mount);
 
 mount(App, "#app");

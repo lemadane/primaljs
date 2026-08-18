@@ -21,7 +21,7 @@ import {
     Catch,
     Await,
     Pending,
-    Render
+    Mount
 } from "../../primal.js";
 
 // --- Global Reactive State ---

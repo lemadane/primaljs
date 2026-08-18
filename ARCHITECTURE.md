@@ -27,7 +27,7 @@ Application Root Owner (MountedApp)
    ├── Component Owner
    │     ├── Signals / Computed / Effects
    │     ├── Event Listeners & Ref Bindings (ref.current = null on disposal)
-   │     └── Child Owners (<If>, <For>, <Switch>, <Try>, <Render>, <Async>, <Await>, <RouteOutlet>)
+   │     └── Child Owners (<If>, <For>, <Switch>, <Try>, <Mount>, <Async>, <Await>, <RouteOutlet>)
    └── Router Owner
 ```
 
@@ -71,7 +71,7 @@ PrimalJS provides first-class declarative control-flow components operating dire
 2. **Switch (`<Switch>`, `<Case>`, `<Default>`)**: First-match-wins strict equality / predicate branch selection.
 3. **Loop (`<For>`, `<Continue />`, `<Break />`, `<Else>`)**: Keyed real-DOM item range reconciliation preserving DOM identity (`johnBefore === johnAfter`).
 4. **Error Boundary (`<Try>`, `<Catch>`)**: Real DOM range error catching for UI render, lifecycle, and event failures.
-5. **Component Switcher (`<Render>`)**: Dynamic component switching for already-loaded components (`<Render component=${page} />`).
+5. **Component Switcher (`<Mount>`)**: Declarative dynamic component switching in native tagged templates (`<Mount component=${page} />`). Note: `<Mount>` is the declarative template component tag, distinct from the imperative application mounting function `mount(Component, target)`.
 6. **Async Loader (`<Async>`, `<Pending>`, `<Catch>`)**: Dynamic ES module loading (`import()`) with pending spinners and `(error, retry)` recovery.
 7. **Promise Awaiter (`<Await>`, `<Pending>`, `<Catch>`)**: Promise data awaiting with operation version tokens, native `AbortController` cancellation, and `(error, retry)` recovery.
 

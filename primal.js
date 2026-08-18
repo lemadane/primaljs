@@ -42,7 +42,7 @@ export {
     Async,
     Await,
     Pending,
-    Render,
+    Mount,
     createRouter,
     useRoute,
     navigate,

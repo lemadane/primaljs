@@ -24,7 +24,7 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
   - [`<Switch>`, `<Case>`, `<Default>` — Branch Matching](#switch-case-default--branch-matching)
   - [`<For>`, `<Continue />`, `<Break />`, `<Else>` — Keyed Loops](#for-continue-break-else--keyed-loops)
   - [`<Delay>`, `<Wait>`, `<Briefly>`, `<Failed>` — Expressive Async Controls](#delay-wait-briefly-failed--expressive-async-controls)
-  - [`<Render>` — Dynamic Component Switcher](#render--dynamic-component-switcher)
+  - [`<Mount>` — Dynamic Component Switcher](#mount--dynamic-component-switcher)
   - [`<Try>`, `<Catch>` — UI Error Boundaries](#try-catch--ui-error-boundaries)
 - [Client-Side SPA Router & Layouts](#client-side-spa-router--layouts)
 - [SEO & Pre-rendered DOM Activation](#seo--pre-rendered-dom-activation)
@@ -377,12 +377,16 @@ html`
 
 > **Backward Compatibility**: `Async`, `Await`, `Pending`, and `Catch` remain exported as fully functional aliases.
 
-### `<Render>` — Dynamic Component Switcher
+### `<Mount>` — Dynamic Component Switcher
+
+> **Distinction (`mount()` vs `<Mount>`)**:
+> - `mount(Component, target, options)` is the **imperative application entry function** used to attach a root component to a target DOM container (e.g., `mount(App, "#app")`).
+> - `<Mount component=${activeTab} />` is the **declarative component tag** used inside templates to dynamically switch active components in an owned real-DOM range without rerunning the parent component (`executions === 1`).
 
 Mounts dynamic component references in an owned DOM range without re-executing the enclosing parent component function (`executions === 1`).
 
 ```javascript
-import { html, signal, Render } from "primaljs";
+import { html, signal, Mount } from "primaljs";
 
 function OverviewTab(props) { return html`<div>Overview: ${props.user.name}</div>`; }
 function SettingsTab(props) { return html`<div>Settings: ${props.user.name}</div>`; }
@@ -395,7 +399,7 @@ html`
         <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
         <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
 
-        <Render component=${activeTab} user=${user} />
+        <Mount component=${activeTab} user=${user} />
     </div>
 `
 ```

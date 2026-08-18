@@ -19,7 +19,14 @@ export function reportGlobalError(error, context = {}) {
     isHandlingGlobalError = true;
     try {
         let handled = false;
-        if (activeAppHandlers.length > 0) {
+
+        const targetCtx = context.ctx || context.owner;
+        if (targetCtx && typeof targetCtx.appOnError === "function") {
+            targetCtx.appOnError(error, context);
+            handled = true;
+        }
+
+        if (!handled && activeAppHandlers.length > 0) {
             const currentAppHandler = activeAppHandlers[activeAppHandlers.length - 1];
             if (typeof currentAppHandler === "function") {
                 currentAppHandler(error, context);
@@ -120,7 +127,7 @@ export function createApp(config = {}) {
                     const targetEl = typeof target === "string" ? document.querySelector(target) : target;
                     if (targetEl) {
                         targetEl.innerHTML = "";
-                        mountedAppHandle = mount(() => router.RouterView(), targetEl);
+                        mountedAppHandle = mount(() => router.RouterView(), targetEl, { onError });
                         return {
                             dispose: disposeApp
                         };
@@ -128,7 +135,7 @@ export function createApp(config = {}) {
                     return;
                 }
                 if (rootComponent) {
-                    mountedAppHandle = mount(rootComponent, target);
+                    mountedAppHandle = mount(rootComponent, target, { onError });
                     return {
                         dispose: disposeApp
                     };
@@ -144,7 +151,7 @@ export function createApp(config = {}) {
             pushAppHandler();
             try {
                 if (rootComponent) {
-                    mountedAppHandle = activate(rootComponent, target, initialState);
+                    mountedAppHandle = activate(rootComponent, target, initialState, { onError });
                     return {
                         dispose: disposeApp
                     };

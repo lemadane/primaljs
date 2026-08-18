@@ -55,7 +55,7 @@ export class Owner {
             try {
                 hook();
             } catch (err) {
-                reportGlobalError(err, { type: "onDestroy", component: this.name });
+                reportGlobalError(err, { type: "onDestroy", component: this.name, ctx: this });
             }
         }
         this.destroyHooks = [];
@@ -64,7 +64,7 @@ export class Owner {
             try {
                 disposer();
             } catch (err) {
-                reportGlobalError(err, { type: "effect_cleanup", component: this.name });
+                reportGlobalError(err, { type: "effect_cleanup", component: this.name, ctx: this });
             }
         }
         this.effects = [];

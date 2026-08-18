@@ -7,7 +7,7 @@ import { ComponentContext, pushContext, popContext, triggerMount, destroyContext
 import { unmount } from "./mount.js";
 import { activateTemplate, TemplateResult } from "./html.js";
 
-export function activate(App, target, initialState = {}) {
+export function activate(App, target, initialState = {}, options = {}) {
     if (typeof document === "undefined") return null;
 
     const targetEl = typeof target === "string" ? document.querySelector(target) : target;
@@ -41,6 +41,9 @@ export function activate(App, target, initialState = {}) {
     }
 
     const rootCtx = new ComponentContext(App.name || "Root");
+    if (options && typeof options.onError === "function") {
+        rootCtx.appOnError = options.onError;
+    }
     targetEl._primalCtx = rootCtx;
 
     try {

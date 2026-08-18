@@ -1,7 +1,7 @@
 import "./setup.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { createApp, html, onMount, onDestroy, effect, signal, register } from "../src/index.js";
+import { createApp, signal, html, onMount, onDestroy, effect, register } from "../src/index.js";
 
 describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
     it("wires createApp.onError into unhandled event handler crashes", () => {
@@ -9,7 +9,10 @@ describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
         let reportedContext = null;
 
         function CrashyButton() {
-            return html`<button id="crash-btn" onclick=${() => { throw new Error("Button click crash!"); }}>Click Me</button>`;
+            const handleClick = () => {
+                throw new Error("Event handler crash!");
+            };
+            return html`<button id="btn" onclick=${handleClick}>Click Me</button>`;
         }
 
         register(CrashyButton);
@@ -24,11 +27,12 @@ describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
 
         app.mount("#app");
 
-        const btn = document.getElementById("crash-btn");
+        const btn = document.querySelector("#btn");
+        assert.ok(btn);
         btn.click();
 
         assert.ok(reportedError);
-        assert.equal(reportedError.message, "Button click crash!");
+        assert.equal(reportedError.message, "Event handler crash!");
         assert.equal(reportedContext.type, "event_handler");
 
         app.dispose();
@@ -86,6 +90,9 @@ describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
         });
 
         const handle = app.mount("#app");
+
+        assert.equal(reportedError, null);
+
         handle.dispose();
 
         assert.ok(reportedError);
@@ -196,5 +203,49 @@ describe("PrimalJS createApp.onError Global Error Boundary Wiring", () => {
         assert.equal(app2Error.message, "App 2 Error");
 
         app2.dispose();
+    });
+
+    it("isolates onError handlers for SIMULTANEOUSLY mounted createApp instances", () => {
+        let appAError = null;
+        let appBError = null;
+
+        document.body.innerHTML = '<div id="container-a"></div><div id="container-b"></div>';
+
+        function ComponentA() {
+            onDestroy(() => { throw new Error("App A Destroy Failure"); });
+            return html`<div>Content A</div>`;
+        }
+
+        function ComponentB() {
+            onDestroy(() => { throw new Error("App B Destroy Failure"); });
+            return html`<div>Content B</div>`;
+        }
+
+        register(ComponentA, ComponentB);
+
+        const appA = createApp({
+            root: ComponentA,
+            onError(err) { appAError = err; }
+        });
+
+        const appB = createApp({
+            root: ComponentB,
+            onError(err) { appBError = err; }
+        });
+
+        // Mount both simultaneously
+        const handleA = appA.mount("#container-a");
+        const handleB = appB.mount("#container-b");
+
+        // Trigger destroy failure in App A while App B is active
+        handleA.dispose();
+
+        assert.ok(appAError, "App A's error handler MUST receive App A's destroy error");
+        assert.equal(appAError.message, "App A Destroy Failure");
+        assert.equal(appBError, null, "App B's error handler MUST NOT receive App A's error");
+
+        handleB.dispose();
+        assert.ok(appBError, "App B's error handler receives App B's destroy error");
+        assert.equal(appBError.message, "App B Destroy Failure");
     });
 });

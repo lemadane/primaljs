@@ -149,7 +149,7 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await context.close();
     });
 
-    it("runs dynamic render app (examples/render) testing <Render> component switching", async () => {
+    it("runs dynamic render app (examples/render) testing <Mount> component switching", async () => {
         const context = await browser.newContext();
         const page = await context.newPage();
         await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });
