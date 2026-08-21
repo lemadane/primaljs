@@ -1,0 +1,162 @@
+{
+  "$schema": "https://raw.githubusercontent.com/microsoft/vscode-html-languageservice/main/docs/customData.schema.json",
+  "version": 1.1,
+  "tags": [
+    {
+      "name": "If",
+      "description": "PrimalJS declarative conditional rendering container.",
+      "attributes": [
+        {
+          "name": "when",
+          "description": "Boolean expression, Signal, or predicate function determining whether to render children."
+        }
+      ]
+    },
+    {
+      "name": "ElseIf",
+      "description": "Alternative conditional branch inside an <If> container.",
+      "attributes": [
+        {
+          "name": "when",
+          "description": "Boolean expression, Signal, or predicate function."
+        }
+      ]
+    },
+    {
+      "name": "Else",
+      "description": "Fallback branch inside an <If> or <For> container."
+    },
+    {
+      "name": "Switch",
+      "description": "PrimalJS branch selector container evaluated against child <Case> tags.",
+      "attributes": [
+        {
+          "name": "value",
+          "description": "Reactive value or getter function to match against child <Case> tags."
+        }
+      ]
+    },
+    {
+      "name": "Case",
+      "description": "Match branch inside a <Switch> container.",
+      "attributes": [
+        {
+          "name": "value",
+          "description": "Single value to match against the parent <Switch> value."
+        },
+        {
+          "name": "values",
+          "description": "Array of values to match against the parent <Switch> value."
+        },
+        {
+          "name": "when",
+          "description": "Predicate callback (val) => boolean to evaluate against the switch value."
+        }
+      ]
+    },
+    {
+      "name": "Default",
+      "description": "Fallback match branch inside a <Switch> container."
+    },
+    {
+      "name": "For",
+      "description": "PrimalJS fine-grained keyed list rendering container.",
+      "attributes": [
+        {
+          "name": "each",
+          "description": "Array, Signal containing an array, or getter function returning an array."
+        },
+        {
+          "name": "key",
+          "description": "Property name string or key function (item, index) => any used to track DOM node identity."
+        }
+      ]
+    },
+    {
+      "name": "Continue",
+      "description": "Skips rendering the current item iteration inside a <For> loop.",
+      "attributes": [
+        {
+          "name": "when",
+          "description": "Optional condition to evaluate before skipping iteration."
+        }
+      ]
+    },
+    {
+      "name": "Break",
+      "description": "Terminates loop execution inside a <For> loop.",
+      "attributes": [
+        {
+          "name": "when",
+          "description": "Optional condition to evaluate before breaking loop."
+        }
+      ]
+    },
+    {
+      "name": "Try",
+      "description": "PrimalJS declarative error boundary container."
+    },
+    {
+      "name": "Catch",
+      "description": "Error fallback branch inside a <Try>, <Wait>, or <Delay> container."
+    },
+    {
+      "name": "Failed",
+      "description": "Human-first error fallback alias for <Catch>."
+    },
+    {
+      "name": "Wait",
+      "description": "Declarative Promise unwrapping container.",
+      "attributes": [
+        {
+          "name": "for",
+          "description": "Promise, Signal containing a Promise, or Promise factory function."
+        }
+      ]
+    },
+    {
+      "name": "Await",
+      "description": "Alias for <Wait>."
+    },
+    {
+      "name": "Delay",
+      "description": "Declarative async task & dynamic component loading container.",
+      "attributes": [
+        {
+          "name": "component",
+          "description": "Dynamic import or lazy component factory."
+        },
+        {
+          "name": "task",
+          "description": "Async task function returning a Promise."
+        }
+      ]
+    },
+    {
+      "name": "Async",
+      "description": "Alias for <Delay>."
+    },
+    {
+      "name": "Pending",
+      "description": "Loading state fallback branch inside a <Wait>, <Delay>, <Await>, or <Async> container."
+    },
+    {
+      "name": "Briefly",
+      "description": "Human-first loading fallback alias for <Pending>."
+    },
+    {
+      "name": "Mount",
+      "description": "Dynamically mounts a PrimalJS function component or Signal component.",
+      "attributes": [
+        {
+          "name": "component",
+          "description": "Function component or Signal containing a component."
+        }
+      ]
+    },
+    {
+      "name": "RouteOutlet",
+      "description": "Renders active child layout route inside a PrimalJS Router."
+    }
+  ]
+}

@@ -17,21 +17,46 @@ import { reportGlobalError } from "./app.js";
 
 const templateCache = new WeakMap();
 
+/**
+ * Represents an un-rendered tagged template HTML result.
+ */
 export class TemplateResult {
+    /**
+     * @param {TemplateStringsArray} strings
+     * @param {any[]} values
+     */
     constructor(strings, values) {
+        /** @type {"TemplateResult"} */
         this.kind = "TemplateResult";
+        /** @type {TemplateStringsArray} */
         this.strings = strings;
+        /** @type {any[]} */
         this.values = values;
     }
 }
 
+/**
+ * Tagged template function for constructing PrimalJS HTML template results.
+ *
+ * @param {TemplateStringsArray} strings
+ * @param {...any} values
+ * @returns {TemplateResult}
+ */
 export function html(strings, ...values) {
     return new TemplateResult(strings, values);
 }
 
+/**
+ * Wraps raw HTML string to bypass automatic XSS escaping.
+ * Use with caution for trusted HTML content only.
+ *
+ * @param {any} content
+ * @returns {{ __isUnsafeHtml: true, content: string }}
+ */
 export function unsafeHtml(content) {
     return { __isUnsafeHtml: true, content: String(content ?? "") };
 }
+
 
 /**
  * Pre-processes HTML string to convert self-closing custom components (<Greeting />)

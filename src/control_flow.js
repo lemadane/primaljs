@@ -17,7 +17,10 @@ import { convertToDOMNode, resolveInnerSubtree } from "./html.js";
 import { reportGlobalError } from "./app.js";
 
 /**
- * <ElseIf> Component helper
+ * `<ElseIf>` Conditional Branch Component.
+ *
+ * @param {{ when: boolean | import("./signal.js").Signal<boolean> | (() => boolean), children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function ElseIf(props) {
     const ctx = getCurrentContext();
@@ -33,7 +36,10 @@ export function ElseIf(props) {
 }
 
 /**
- * <Else> Component helper
+ * `<Else>` Fallback Branch Component for `<If>` or `<For>`.
+ *
+ * @param {{ children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Else(props) {
     const ctx = getCurrentContext();
@@ -49,7 +55,10 @@ export function Else(props) {
 }
 
 /**
- * <Case> Component helper
+ * `<Case>` Match Branch Component for `<Switch>`.
+ *
+ * @param {{ value?: any, values?: any[], when?: boolean | ((val: any) => boolean), children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Case(props) {
     const ctx = getCurrentContext();
@@ -84,7 +93,10 @@ export function Case(props) {
 }
 
 /**
- * <Default> Component helper
+ * `<Default>` Fallback Branch Component for `<Switch>`.
+ *
+ * @param {{ children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Default(props) {
     const ctx = getCurrentContext();
@@ -99,7 +111,10 @@ export function Default(props) {
 }
 
 /**
- * <Continue> Component helper
+ * `<Continue>` Control Component to skip loop iterations in `<For>`.
+ *
+ * @param {{ when?: boolean | import("./signal.js").Signal<boolean> | (() => boolean) } & Record<string, any>} [props]
+ * @returns {any}
  */
 export function Continue(props) {
     const ctx = getCurrentContext();
@@ -118,7 +133,10 @@ export function Continue(props) {
 }
 
 /**
- * <Break> Component helper
+ * `<Break>` Control Component to terminate loop execution in `<For>`.
+ *
+ * @param {{ when?: boolean | import("./signal.js").Signal<boolean> | (() => boolean) } & Record<string, any>} [props]
+ * @returns {any}
  */
 export function Break(props) {
     const ctx = getCurrentContext();
@@ -137,7 +155,10 @@ export function Break(props) {
 }
 
 /**
- * <Pending> Component helper
+ * `<Pending>` Pending Fallback Component for async states.
+ *
+ * @param {{ children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Pending(props) {
     const ctx = getCurrentContext();
@@ -156,7 +177,10 @@ export function Pending(props) {
 }
 
 /**
- * <Briefly> Component helper (Human-first loading fallback)
+ * `<Briefly>` Loading Fallback Component.
+ *
+ * @param {{ children?: any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Briefly(props) {
     const ctx = getCurrentContext();
@@ -175,7 +199,10 @@ export function Briefly(props) {
 }
 
 /**
- * <Catch> Component helper
+ * `<Catch>` Error Fallback Component for `<Try>`, `<Await>`, `<Async>`, etc.
+ *
+ * @param {{ children?: ((error: Error | any, reset?: () => void) => any) | any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Catch(props) {
     const ctx = getCurrentContext();
@@ -199,7 +226,10 @@ export function Catch(props) {
 }
 
 /**
- * <Failed> Component helper (Human-first error fallback)
+ * `<Failed>` Error Fallback Component.
+ *
+ * @param {{ children?: ((error: Error | any, reset?: () => void) => any) | any } & Record<string, any>} props
+ * @returns {any}
  */
 export function Failed(props) {
     const ctx = getCurrentContext();
@@ -221,6 +251,7 @@ export function Failed(props) {
         children: children
     };
 }
+
 
 function isFormattingWhitespace(node) {
     if (typeof node === "string") {
@@ -992,7 +1023,10 @@ function renderItemNodes(item, index, renderItem, props, itemCtx) {
 }
 
 /**
- * Declarative <If> Component
+ * Declarative `<If>` Conditional Rendering Component.
+ *
+ * @param {{ when: boolean | import("./signal.js").Signal<boolean> | (() => boolean), children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function If(props) {
     const ctx = getCurrentContext();
@@ -1079,7 +1113,10 @@ export function If(props) {
 }
 
 /**
- * Declarative <Switch> Component
+ * Declarative `<Switch>` Branch Switcher Component.
+ *
+ * @param {{ value?: any | import("./signal.js").Signal<any> | (() => any), children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function Switch(props) {
     const ctx = getCurrentContext();
@@ -1191,9 +1228,14 @@ export function Switch(props) {
 }
 
 /**
- * Declarative <For> Component
+ * Declarative Keyed Item Loop Component `<For>`.
+ *
+ * @template T
+ * @param {{ each: T[] | import("./signal.js").Signal<T[]> | (() => T[]), key?: string | ((item: T, index: number) => any), children?: (item: T, index: number) => any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function For(props) {
+
     const ctx = getCurrentContext();
     const { renderItem, elseBranch } = parseForChildren(props);
 
@@ -1375,7 +1417,10 @@ export function For(props) {
 }
 
 /**
- * Declarative <Try> Component
+ * Declarative Error Boundary Component `<Try>`.
+ *
+ * @param {{ children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function Try(props) {
     const ctx = getCurrentContext();
@@ -1524,7 +1569,10 @@ export function Try(props) {
 }
 
 /**
- * Declarative <Wait> Component (Single Promise Unwrapping)
+ * Declarative `<Wait>` Promise Unwrapping Component.
+ *
+ * @param {{ for?: Promise<any> | (() => Promise<any>) | import("./signal.js").Signal<Promise<any>>, children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function Wait(props) {
     const ctx = getCurrentContext();
@@ -1732,7 +1780,10 @@ export function Wait(props) {
 }
 
 /**
- * Declarative <Delay> Component (Reactive Async Tasks & Component Loading)
+ * Declarative `<Delay>` Component for Async Dynamic Imports & Tasks.
+ *
+ * @param {{ for?: any, component?: any, task?: any, children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function Delay(props) {
     const ctx = getCurrentContext();
@@ -1977,11 +2028,22 @@ export function Delay(props) {
 }
 
 // Backward-compatibility aliases
+/**
+ * Alias for `<Delay>`.
+ *
+ * @param {{ for?: any, component?: any, task?: any, children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
+ */
 export function Async(props) {
     return Delay(props);
 }
 
+/**
+ * Alias for `<Wait>`.
+ *
+ * @param {{ for?: Promise<any> | (() => Promise<any>) | import("./signal.js").Signal<Promise<any>>, children?: any } & Record<string, any>} props
+ * @returns {DocumentFragment}
+ */
 export function Await(props) {
     return Wait(props);
 }
-

@@ -4,7 +4,25 @@
 
 import { reportGlobalError } from "./app.js";
 
+/**
+ * @typedef {Object} PwaOptions
+ * @property {boolean} [enabled=true] Enables or disables PWA Service Worker registration.
+ * @property {string} [swPath="./sw.js"] Path to the Service Worker script.
+ * @property {string} [scope="./"] Scope for the Service Worker.
+ * @property {"auto" | "prompt"} [updateStrategy="auto"] Strategy for handling Service Worker updates.
+ * @property {boolean} [reloadOnUpdate=true] Automatically reload page on worker update.
+ * @property {boolean} [cleanup] Unregister Service Workers and clear caches.
+ * @property {() => void} [onUpdateAvailable] Callback when a new worker update is ready (for "prompt" mode).
+ * @property {() => void} [onOfflineReady] Callback when application is cached for offline use.
+ */
+
+/**
+ * Configures and registers Service Workers for Progressive Web App support.
+ *
+ * @param {PwaOptions | boolean} [options={}]
+ */
 export function setupPwa(options = {}) {
+
     if (typeof window === "undefined" || !("serviceWorker" in navigator)) {
         return;
     }

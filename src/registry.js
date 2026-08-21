@@ -8,6 +8,11 @@ import { Mount } from "./mount.js";
 
 const registry = new Map();
 
+/**
+ * Registers one or more named function components for dynamic template tag lookup.
+ *
+ * @param {...Function} components
+ */
 export function register(...components) {
     for (const comp of components) {
         if (typeof comp !== "function") {
@@ -22,11 +27,20 @@ export function register(...components) {
     }
 }
 
+/**
+ * Retrieves a registered component by tag name (case-insensitive).
+ *
+ * @param {string} name
+ * @returns {Function | null}
+ */
 export function getComponent(name) {
     if (!name) return null;
     return registry.get(name) || registry.get(name.toLowerCase()) || null;
 }
 
+/**
+ * Clears custom components from the registry while preserving default control flow components.
+ */
 export function clearRegistry() {
     const savedRouteOutlet = registry.get("RouteOutlet");
     registry.clear();
@@ -35,6 +49,7 @@ export function clearRegistry() {
         register(savedRouteOutlet);
     }
 }
+
 
 function registerDefaultComponents() {
     register(If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending, Mount);

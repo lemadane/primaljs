@@ -7,7 +7,17 @@ import { ComponentContext, pushContext, popContext, triggerMount, destroyContext
 import { unmount } from "./mount.js";
 import { activateTemplate, TemplateResult } from "./html.js";
 
+/**
+ * Activates/hydrates a pre-rendered DOM subtree without destroying or recreating existing HTML nodes.
+ *
+ * @param {import("./mount.js").Component} App Root application component function.
+ * @param {string | Element} target Selector or element container to activate.
+ * @param {Record<string, any>} [initialState={}] Initial state payload.
+ * @param {{ onError?: (error: Error, context?: any) => void }} [options={}]
+ * @returns {import("./mount.js").AppHandle | null}
+ */
 export function activate(App, target, initialState = {}, options = {}) {
+
     if (typeof document === "undefined") return null;
 
     const targetEl = typeof target === "string" ? document.querySelector(target) : target;

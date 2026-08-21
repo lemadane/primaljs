@@ -32,8 +32,20 @@ function insertAfterAnchor(startAnchor, domNode) {
 }
 
 /**
- * Declarative <Mount> Component Helper
- * Dynamically mounts an already-available component in an owned real-DOM range without parent rerenders.
+ * @typedef {Object} AppHandle
+ * @property {() => void} dispose Disposes the mounted application and cleans up reactive subscriptions.
+ */
+
+/**
+ * @typedef {(props?: any) => import("./html.js").TemplateResult | Element | DocumentFragment | string | null} Component
+ */
+
+/**
+ * Declarative `<Mount>` Component Helper.
+ * Dynamically mounts a component in an owned real-DOM range without parent rerenders.
+ *
+ * @param {{ component: Component | import("./signal.js").Signal<Component> | null | undefined } & Record<string, any>} props
+ * @returns {DocumentFragment}
  */
 export function Mount(props) {
     const ctx = getCurrentContext();
@@ -129,6 +141,14 @@ export function Mount(props) {
     return fragment;
 }
 
+/**
+ * Mounts a PrimalJS root component to a target DOM selector or Element.
+ *
+ * @param {Component} Component
+ * @param {string | Element} target
+ * @param {{ onError?: (error: Error, context?: any) => void }} [options]
+ * @returns {AppHandle}
+ */
 export function mount(Component, target, options = {}) {
     const targetEl = typeof target === "string" ? document.querySelector(target) : target;
     if (!targetEl) {
@@ -177,6 +197,11 @@ export function mount(Component, target, options = {}) {
     return appHandle;
 }
 
+/**
+ * Unmounts a mounted PrimalJS application from a target element and cleans up context.
+ *
+ * @param {string | Element} target
+ */
 export function unmount(target) {
     const targetEl = typeof target === "string" ? document.querySelector(target) : target;
     if (!targetEl) return;
@@ -188,3 +213,4 @@ export function unmount(target) {
     }
     targetEl.innerHTML = "";
 }
+

@@ -23,6 +23,12 @@ const currentRouteSignal = signal({
 
 let globalNavigationId = 0;
 
+/**
+ * Creates a lazy-loaded component wrapper for code-splitting routes.
+ *
+ * @param {() => Promise<{ default: Function } | Function>} factory
+ * @returns {Function & { __isLazy: boolean, factory: Function, resolve: () => Promise<Function> }}
+ */
 export function lazy(factory) {
     let cachedComponent = null;
     let pendingPromise = null;
@@ -67,6 +73,140 @@ export function lazy(factory) {
 
     return LazyWrapper;
 }
+
+/**
+ * Declarative `<RouteOutlet>` Component for rendering child layout routes.
+ *
+ * @param {{ depth?: number }} [props]
+ * @returns {import("./html.js").TemplateResult}
+ */
+export function RouteOutlet(props) {
+    const ctx = getCurrentContext();
+    let depth = props ? props.depth : undefined;
+    if (depth === undefined) {
+        let count = 0;
+        let p = ctx ? ctx.parent : null;
+        while (p) {
+            if (p.isRouteOutlet) {
+                count++;
+            }
+            p = p.parent;
+        }
+        depth = count;
+    }
+
+    if (ctx) {
+        ctx.isRouteOutlet = true;
+    }
+
+    const currentRouter = globalRouterInstance;
+
+    let previousComponent = null;
+    let previousRouteKey = null;
+    let previousWrapper = null;
+
+    const comp = computed(() => {
+        if (!currentRouter) {
+            previousComponent = null;
+            previousRouteKey = null;
+            previousWrapper = null;
+            return null;
+        }
+        const layers = currentRouter.activeLayers.value;
+        const layer = layers && layers.length > depth ? layers[depth] : null;
+        if (!layer || !layer.component) {
+            previousComponent = null;
+            previousRouteKey = null;
+            previousWrapper = null;
+            return null;
+        }
+
+        const component = layer.component;
+        const isLeaf = depth === layers.length - 1;
+        const paramsKey = JSON.stringify(layer.params || {});
+        const queryKey = isLeaf && currentRouter.activeQuery.value ? currentRouter.activeQuery.value.toString() : "";
+        const hashKey = isLeaf ? (currentRouter.activeHash.value || "") : "";
+        const routeKey = `${paramsKey}:${queryKey}:${hashKey}`;
+
+        if (component === previousComponent && routeKey === previousRouteKey) {
+            return previousWrapper;
+        }
+
+        const RouteWrapper = function RouteWrapper(routeProps) {
+            return component(routeProps);
+        };
+        if (component.name) {
+            Object.defineProperty(RouteWrapper, "name", { value: component.name });
+        }
+
+        previousComponent = component;
+        previousRouteKey = routeKey;
+        previousWrapper = RouteWrapper;
+
+        return RouteWrapper;
+    });
+
+    return html`<Mount component=${comp} />`;
+}
+
+let globalRouterInstance = null;
+
+/**
+ * @typedef {Object} RouteDefinition
+ * @property {string} path Route matching pattern (e.g. "/", "/users/:id").
+ * @property {Function} [component] Component function for this route.
+ * @property {RouteDefinition[]} [children] Nested child routes.
+ * @property {Function} [beforeEnter] Guard function called before navigating to this route.
+ * @property {Object} [meta] SEO or route metadata.
+ */
+
+/**
+ * Creates a PrimalJS SPA Router instance.
+ *
+ * @param {{ routes: RouteDefinition[], mode?: "history" | "hash" }} options
+ * @returns {Router}
+ */
+export function createRouter(options) {
+    const router = new Router(options);
+    globalRouterInstance = router;
+    batch(() => {
+        currentRouteSignal.value = {
+            path: "/",
+            params: {},
+            query: new URLSearchParams(),
+            hash: "",
+            component: null,
+            meta: null
+        };
+    });
+    router.init();
+    return router;
+}
+
+/**
+ * Accesses the active route object (path, params, query, hash, component, meta).
+ *
+ * @returns {{ path: string, params: Record<string, string>, query: URLSearchParams, hash: string, component: Function | null, meta: any }}
+ */
+export function useRoute() {
+    return currentRouteSignal.value;
+}
+
+/**
+ * Navigates programmatically to a target path or URL string.
+ *
+ * @param {string} to
+ * @param {{ replace?: boolean }} [options]
+ */
+export function navigate(to, options) {
+    if (globalRouterInstance) {
+        globalRouterInstance.navigate(to, options);
+    }
+}
+
+register(RouteOutlet);
+register(Mount);
+
 
 function matchSegment(pattern, segment) {
     if (pattern === "*") return { [segment]: segment };
@@ -344,103 +484,3 @@ export class Router {
     }
 }
 
-export function RouteOutlet(props = {}) {
-    const ctx = getCurrentContext();
-    let depth = props.depth;
-    if (depth === undefined) {
-        let count = 0;
-        let p = ctx ? ctx.parent : null;
-        while (p) {
-            if (p.isRouteOutlet) {
-                count++;
-            }
-            p = p.parent;
-        }
-        depth = count;
-    }
-
-    if (ctx) {
-        ctx.isRouteOutlet = true;
-    }
-
-    const currentRouter = globalRouterInstance;
-
-    let previousComponent = null;
-    let previousRouteKey = null;
-    let previousWrapper = null;
-
-    const comp = computed(() => {
-        if (!currentRouter) {
-            previousComponent = null;
-            previousRouteKey = null;
-            previousWrapper = null;
-            return null;
-        }
-        const layers = currentRouter.activeLayers.value;
-        const layer = layers && layers.length > depth ? layers[depth] : null;
-        if (!layer || !layer.component) {
-            previousComponent = null;
-            previousRouteKey = null;
-            previousWrapper = null;
-            return null;
-        }
-
-        const component = layer.component;
-        const isLeaf = depth === layers.length - 1;
-        const paramsKey = JSON.stringify(layer.params || {});
-        const queryKey = isLeaf && currentRouter.activeQuery.value ? currentRouter.activeQuery.value.toString() : "";
-        const hashKey = isLeaf ? (currentRouter.activeHash.value || "") : "";
-        const routeKey = `${paramsKey}:${queryKey}:${hashKey}`;
-
-        if (component === previousComponent && routeKey === previousRouteKey) {
-            return previousWrapper;
-        }
-
-        const RouteWrapper = function RouteWrapper(routeProps) {
-            return component(routeProps);
-        };
-        if (component.name) {
-            Object.defineProperty(RouteWrapper, "name", { value: component.name });
-        }
-
-        previousComponent = component;
-        previousRouteKey = routeKey;
-        previousWrapper = RouteWrapper;
-
-        return RouteWrapper;
-    });
-
-    return html`<Mount component=${comp} />`;
-}
-
-let globalRouterInstance = null;
-
-export function createRouter(options) {
-    const router = new Router(options);
-    globalRouterInstance = router;
-    batch(() => {
-        currentRouteSignal.value = {
-            path: "/",
-            params: {},
-            query: new URLSearchParams(),
-            hash: "",
-            component: null,
-            meta: null
-        };
-    });
-    router.init();
-    return router;
-}
-
-export function useRoute() {
-    return currentRouteSignal.value;
-}
-
-export function navigate(to, options) {
-    if (globalRouterInstance) {
-        globalRouterInstance.navigate(to, options);
-    }
-}
-
-register(RouteOutlet);
-register(Mount);

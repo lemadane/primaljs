@@ -7,7 +7,24 @@ let initialTitle = typeof document !== "undefined" ? document.title : "";
 let trackedCustomMetaKeys = new Set();
 let trackedCustomLinkKeys = new Set();
 
+/**
+ * @typedef {Object} HeadMetadata
+ * @property {string} [title] Document page title and og:title.
+ * @property {string} [description] Page meta description and og:description.
+ * @property {string} [image] OpenGraph image URL.
+ * @property {string} [robots] Robots meta directive (e.g. "index, follow").
+ * @property {string} [canonical] Canonical page link URL.
+ * @property {Record<string, string>} [meta] Custom key-value meta tags.
+ * @property {Record<string, string>} [links] Custom key-value rel/link tags.
+ */
+
+/**
+ * Dynamically updates document `<head>` metadata for SEO and route changes.
+ *
+ * @param {HeadMetadata} [meta={}]
+ */
 export function head(meta = {}) {
+
     if (typeof document === "undefined") return;
 
     const m = meta || {};

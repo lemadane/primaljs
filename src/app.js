@@ -11,6 +11,29 @@ let globalOnErrorHandler = null;
 let isHandlingGlobalError = false;
 const activeAppHandlers = [];
 
+/**
+ * @typedef {Object} AppConfig
+ * @property {import("./mount.js").Component} [root] Root application component function.
+ * @property {import("./mount.js").Component} [app] Alias for `root`.
+ * @property {import("./router.js").Router} [router] Optional PrimalJS Router instance.
+ * @property {import("./pwa.js").PwaOptions} [pwa] Optional PWA configuration.
+ * @property {boolean} [dev] Enable dev diagnostics mode.
+ * @property {(error: Error, context?: any) => void} [onError] Custom application error handler.
+ */
+
+/**
+ * @typedef {Object} AppInstance
+ * @property {(target: string | Element) => import("./mount.js").AppHandle | undefined} mount Mounts application to target element.
+ * @property {(target: string | Element, initialState?: any) => import("./mount.js").AppHandle | undefined} activate Activates/hydrates application on target element.
+ * @property {() => void} dispose Disposes application resources.
+ */
+
+/**
+ * Dispatches an error through the hierarchy of component boundaries, application error handlers, and global handlers.
+ *
+ * @param {Error | any} error
+ * @param {Record<string, any>} [context={}]
+ */
 export function reportGlobalError(error, context = {}) {
     if (isHandlingGlobalError) {
         console.error("PrimalJS: Error inside global onError handler:", error);
@@ -47,13 +70,25 @@ export function reportGlobalError(error, context = {}) {
     }
 }
 
+/**
+ * Configures the fallback global error handler.
+ *
+ * @param {((error: Error, context?: any) => void) | null} handler
+ */
 export function setGlobalOnError(handler) {
     if (typeof handler === "function" || handler === null) {
         globalOnErrorHandler = handler;
     }
 }
 
+/**
+ * Creates a PrimalJS application instance.
+ *
+ * @param {AppConfig} [config={}]
+ * @returns {AppInstance}
+ */
 export function createApp(config = {}) {
+
     const rootComponent = config.root || config.app;
     const router = config.router;
     const pwaOptions = config.pwa;

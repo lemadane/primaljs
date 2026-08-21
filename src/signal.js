@@ -11,6 +11,12 @@ const effectStack = [];
 let batchDepth = 0;
 const pendingNotifyEffects = new Set();
 
+/**
+ * Checks if a value is a PrimalJS Signal or Computed instance.
+ *
+ * @param {any} val
+ * @returns {boolean}
+ */
 export function isSignal(val) {
     return val !== null && typeof val === "object" && val.__isSignal === true;
 }
@@ -25,6 +31,13 @@ function flushBatch() {
     }
 }
 
+/**
+ * Batches multiple signal updates so dependent effects run only once after completion.
+ *
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
+ */
 export function batch(fn) {
     batchDepth++;
     try {
@@ -37,6 +50,13 @@ export function batch(fn) {
     }
 }
 
+/**
+ * Runs a function without tracking signal dependencies accessed inside it.
+ *
+ * @template T
+ * @param {() => T} fn
+ * @returns {T}
+ */
 export function untrack(fn) {
     const prevActive = activeEffect;
     activeEffect = null;
@@ -47,13 +67,29 @@ export function untrack(fn) {
     }
 }
 
+/**
+ * A reactive state holder containing a value that notifies subscribers on change.
+ *
+ * @template T
+ */
 export class Signal {
+    /**
+     * @param {T} initialValue
+     */
     constructor(initialValue) {
+        /** @private @type {T} */
         this._value = initialValue;
+        /** @type {Set<ReactiveEffect | Object>} */
         this.subscribers = new Set();
+        /** @type {boolean} */
         this.__isSignal = true;
     }
 
+    /**
+     * Reads the current signal value and registers reactive dependency tracking.
+     *
+     * @returns {T}
+     */
     get value() {
         if (activeEffect && !activeEffect.disposed) {
             this.subscribers.add(activeEffect);
@@ -62,6 +98,11 @@ export class Signal {
         return this._value;
     }
 
+    /**
+     * Updates the signal value and notifies all subscribers if changed.
+     *
+     * @param {T} newValue
+     */
     set value(newValue) {
         if (!Object.is(this._value, newValue)) {
             this._value = newValue;
@@ -69,6 +110,9 @@ export class Signal {
         }
     }
 
+    /**
+     * Notifies subscribers of a value change.
+     */
     notify() {
         const subs = Array.from(this.subscribers);
         for (const sub of subs) {
@@ -84,24 +128,52 @@ export class Signal {
         }
     }
 
+    /**
+     * Returns the string representation of the signal value.
+     *
+     * @returns {string}
+     */
     toString() {
         return String(this.value);
     }
 }
 
+/**
+ * Creates a reactive signal.
+ *
+ * @template T
+ * @param {T} initialValue
+ * @returns {Signal<T>}
+ */
 export function signal(initialValue) {
     return new Signal(initialValue);
 }
 
+/**
+ * A derived reactive value computed from signal dependencies.
+ *
+ * @template T
+ */
 export class Computed {
+    /**
+     * @param {() => T} fn
+     */
     constructor(fn) {
+        /** @type {() => T} */
         this.fn = fn;
+        /** @private @type {T | undefined} */
         this._value = undefined;
+        /** @private @type {boolean} */
         this._dirty = true;
+        /** @type {Set<ReactiveEffect | Object>} */
         this.subscribers = new Set();
+        /** @type {Set<Signal<any> | Computed<any>>} */
         this.deps = new Set();
+        /** @type {boolean} */
         this.__isSignal = true;
+        /** @type {boolean} */
         this.__isComputed = true;
+        /** @private @type {boolean} */
         this._disposed = false;
 
         const ctx = getCurrentContext();
@@ -122,9 +194,14 @@ export class Computed {
         };
     }
 
+    /**
+     * Gets the computed value, recalculating it if dirty.
+     *
+     * @returns {T}
+     */
     get value() {
         if (this._disposed) {
-            return this._value;
+            return /** @type {T} */ (this._value);
         }
 
         if (this._dirty) {
@@ -139,7 +216,7 @@ export class Computed {
                 const tryBoundary = ctx ? ctx.tryBoundary : null;
                 if (tryBoundary && typeof tryBoundary.handleError === "function") {
                     tryBoundary.handleError(err);
-                    return this._value;
+                    return /** @type {T} */ (this._value);
                 }
                 throw err;
             } finally {
@@ -154,9 +231,10 @@ export class Computed {
             activeEffect.deps.add(this);
         }
 
-        return this._value;
+        return /** @type {T} */ (this._value);
     }
 
+    /** @private */
     _cleanupDeps() {
         for (const dep of this._effect.deps) {
             dep.subscribers.delete(this._effect);
@@ -164,6 +242,9 @@ export class Computed {
         this._effect.deps.clear();
     }
 
+    /**
+     * Notifies subscribers that the computed value may have changed.
+     */
     notify() {
         if (this._disposed) return;
         const subs = Array.from(this.subscribers);
@@ -180,6 +261,9 @@ export class Computed {
         }
     }
 
+    /**
+     * Disposes the computed calculation and unsubscribes from dependencies.
+     */
     dispose() {
         if (this._disposed) return;
         this._disposed = true;
@@ -188,20 +272,42 @@ export class Computed {
         this.subscribers.clear();
     }
 
+    /**
+     * Returns string representation of the computed value.
+     *
+     * @returns {string}
+     */
     toString() {
         return String(this.value);
     }
 }
 
+/**
+ * Creates a derived reactive value.
+ *
+ * @template T
+ * @param {() => T} fn
+ * @returns {Computed<T>}
+ */
 export function computed(fn) {
     return new Computed(fn);
 }
 
+/**
+ * Represents a reactive side-effect computation.
+ */
 export class ReactiveEffect {
+    /**
+     * @param {() => void | (() => void)} fn
+     */
     constructor(fn) {
+        /** @type {() => void | (() => void)} */
         this.fn = fn;
+        /** @type {Set<Signal<any> | Computed<any>>} */
         this.deps = new Set();
+        /** @type {boolean} */
         this.disposed = false;
+        /** @type {(() => void) | null} */
         this.cleanupFn = null;
         const ctx = getCurrentContext();
         this.tryBoundary = ctx ? ctx.tryBoundary : null;
@@ -211,6 +317,9 @@ export class ReactiveEffect {
         this.run();
     }
 
+    /**
+     * Runs the effect callback and records dependencies.
+     */
     run() {
         if (this.disposed) return;
         this.cleanup();
@@ -235,6 +344,9 @@ export class ReactiveEffect {
         }
     }
 
+    /**
+     * Executes cleanup for the previous effect run.
+     */
     cleanup() {
         if (this.cleanupFn) {
             try {
@@ -250,6 +362,9 @@ export class ReactiveEffect {
         this.deps.clear();
     }
 
+    /**
+     * Disposes the reactive effect.
+     */
     dispose() {
         if (this.disposed) return;
         this.cleanup();
@@ -257,11 +372,23 @@ export class ReactiveEffect {
     }
 }
 
+/**
+ * Runs a reactive side effect whenever referenced signals change.
+ *
+ * @param {() => void | (() => void)} fn
+ * @returns {() => void} Disposer function to stop the effect.
+ */
 export function effect(fn) {
     const eff = new ReactiveEffect(fn);
     return () => eff.dispose();
 }
 
+/**
+ * Returns the currently active ReactiveEffect, if any.
+ *
+ * @returns {ReactiveEffect | null}
+ */
 export function getCurrentEffect() {
     return activeEffect;
 }
+
