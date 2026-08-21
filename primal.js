@@ -36,6 +36,7 @@ export {
     setupPwa,
     unregisterServiceWorkers,
     createApp,
+    Boundary,
     PrimalJSError,
     setDevMode
 } from "./src/index.js";

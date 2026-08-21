@@ -310,6 +310,7 @@ export class ReactiveEffect {
         /** @type {(() => void) | null} */
         this.cleanupFn = null;
         const ctx = getCurrentContext();
+        this.ctx = ctx;
         this.tryBoundary = ctx ? ctx.tryBoundary : null;
         if (ctx) {
             ctx.addEffect(() => this.dispose());
@@ -336,8 +337,11 @@ export class ReactiveEffect {
                 this.tryBoundary.handleError(err);
                 return;
             }
-            reportGlobalError(err, { type: "effect" });
-            throw err;
+            const effectCtx = this.ctx || (this.owner instanceof ComponentContext ? this.owner : null) || getCurrentContext();
+            const handled = reportGlobalError(err, { type: "effect", ctx: effectCtx, owner: this });
+            if (!handled) {
+                throw err;
+            }
         } finally {
             activeEffect = prevActive;
             effectStack.pop();

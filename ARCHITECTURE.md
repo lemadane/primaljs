@@ -63,15 +63,24 @@ Micro-Mutation on target Text / Attribute / Property
 
 ---
 
-## 5. Dynamic Component Switcher
+## 5. Reactive Control Flow & Keyed List Reconciliation
 
-PrimalJS uses standard JavaScript control logic (`ternary`, `if/else`, `.map()`, `try/catch`) and provides dynamic component rendering via native tagged templates without Virtual DOM:
+PrimalJS enforces single component execution (`executions === 1`). Routine state updates never re-evaluate component functions.
 
+- **Static vs. Reactive Control Flow**: Standard JavaScript expressions (`if`, `map`) outside arrow functions execute **once on mount**. Wrap reactive conditions or list mappings in arrow functions `${() => ...}` so Signal reads subscribe to fine-grained DOM updates.
+- **Keyed List DOM Reconciliation**: Array maps returned from reactive functions `${() => list.value.map(...)}` reconcile DOM nodes by item key (`key=${item.id}`), `item.key`, `item.id`, or reference identity. Existing DOM nodes are preserved and updated in-place, preserving input focus, text selection, scroll position, and child component state.
 - **Component Switcher (`<Load>`)**: Declarative dynamic component switching in native tagged templates (`<Load component=${page} />`). Note: `<Load>` is the declarative template component tag, distinct from the imperative application mounting function `mount(Component, target)`.
 
 ---
 
-## 6. Client-Side SPA Router & Layout Preservation
+## 6. Zero-Build Standalone Distribution Bundle
+
+- **ESM Exports**: Core modules in `src/` export native ESM modules.
+- **Zero-Build Distribution (`dist/primal.standalone.js`)**: `npm run build` produces a standalone zero-dependency ES module bundle incorporating all framework core primitives. Applications can be served statically with a single `import { ... } from "./js/primal.standalone.js"` without Node.js, npm, or build tools in production.
+
+---
+
+## 7. Client-Side SPA Router & Layout Preservation
 
 - **Native History API**: Built directly on `history.pushState()`, `history.replaceState()`, and `popstate` events.
 - **Nested Routes & Layouts**: Route hierarchy support (`children: [...]`) and declarative `<RouteOutlet>` placeholder.
@@ -86,8 +95,9 @@ PrimalJS uses standard JavaScript control logic (`ternary`, `if/else`, `.map()`,
 
 ---
 
-## 7. Diagnostics & Global Error Boundaries
+## 8. Diagnostics & Local/Global Error Boundaries
 
+- **Local Error Boundary (`<Boundary>`)**: Subtree error boundary component (`<Boundary fallback=${...}>`) catching errors thrown during child component mounting or reactive effect updates. Restricts component failure locally without crashing parent layout or app state.
 - **Development Diagnostics (`dev: true`)**: `PrimalJSError` class and diagnostic validations providing actionable error messages for structural misuse, duplicate keys, or invalid routes.
 - **Global Error Boundary (`createApp({ root, onError })`)**: `onError(err, context)` callback catching unhandled errors escaping local UI boundaries with light context (`{ type, component, route, owner }`).
 

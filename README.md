@@ -100,9 +100,11 @@ mount(Counter, "#app");
 
 Run directly in any web browser without Node.js, npm, or build tools:
 
-1. **Copy `primal.js` into your project**:
+1. **Copy `dist/primal.standalone.js` into your project**:
    ```bash
-   cp /path/to/primaljs/primal.js ./public/js/primal.js
+   # Generate or copy the standalone zero-dependency ES module bundle:
+   npm run build
+   cp ./dist/primal.standalone.js ./public/js/primal.standalone.js
    ```
 
 2. **Create your `index.html`**:
@@ -123,7 +125,7 @@ Run directly in any web browser without Node.js, npm, or build tools:
 
 3. **Create your `./js/app.js`**:
    ```javascript
-   import { html, signal, mount } from "./primal.js";
+   import { html, signal, mount } from "./js/primal.standalone.js";
 
    function App() {
        const message = signal("Hello from PrimalJS!");
@@ -141,303 +143,40 @@ Run directly in any web browser without Node.js, npm, or build tools:
 
 ---
 
-## Reactivity System & State Management
+## Reactive Control Flow & Keyed List Reconciliation
 
-### `signal()` — Reactive State
+Because PrimalJS guarantees single component execution (`executions === 1`), standard JavaScript `if` and `Array.prototype.map` evaluated outside arrow functions run **once on component mount**. To make control flow and list rendering reactive, wrap them inside function expressions:
 
-`signal()` creates a fine-grained reactive state container. Reading `.value` registers dependency tracking inside effects and templates; writing `.value` notifies subscribers.
+| Control Flow Pattern | Static (Runs Once on Mount) | Reactive (Updates on Signal Change) |
+|---|---|---|
+| **Conditional Rendering** | `if (status.value) ...` | `${() => status.value ? html\`<p>Active</p>\` : html\`<p>Inactive</p>\`}` |
+| **List Rendering** | `items.map(item => ...)` | `${() => items.value.map(item => html\`<li key=\${item.id}>\${item.name}</li>\`)}` |
+
+### Keyed List DOM Reconciliation & State Preservation
+Dynamic lists returned from reactive functions `${() => list.value.map(...)}` perform fine-grained DOM node reconciliation using item `key` attributes (`key=${item.id}`), `item.key`, `item.id`, or item identity. Existing DOM elements are updated in-place, preserving input focus, text selection, scroll position, and component state across array mutations.
+
+---
+
+## Local Error Handling with `<Boundary>`
+
+The `<Boundary>` component catches unhandled errors within its child component subtree, preventing whole-app crashes and rendering localized fallback UI:
 
 ```javascript
-import { signal, html } from "primaljs";
+import { html, Boundary } from "primaljs";
 
-const quantity = signal(1);
-
-function CartControls() {
+function App() {
     return html`
-        <div class="cart-controls">
-            <button onclick=${() => quantity.value--}>-</button>
-            <span>Quantity: ${quantity}</span>
-            <button onclick=${() => quantity.value++}>+</button>
-        </div>
+        <Boundary fallback=${(err, retry) => html`
+            <div class="error-card">
+                <p>Failed to load component: ${err.message}</p>
+                <button onclick=${retry}>Try Again</button>
+            </div>
+        `}>
+            <WidgetComponent />
+        </Boundary>
     `;
 }
 ```
-
-### `computed()` — Derived State
-
-`computed()` creates a read-only Signal derived from other Signals. It automatically re-evaluates only when its referenced dependencies change.
-
-```javascript
-import { signal, computed, html } from "primaljs";
-
-const itemPrice = signal(49.99);
-const quantity = signal(2);
-const taxRate = signal(0.08);
-
-const orderTotal = computed(() => {
-    const subtotal = itemPrice.value * quantity.value;
-    const total = subtotal * (1 + taxRate.value);
-    return total.toFixed(2);
-});
-
-function OrderSummary() {
-    return html`<p>Total: <strong>$${orderTotal}</strong></p>`;
-}
-```
-
-### `effect()` — Side Effects & Sync
-
-`effect()` executes a side-effect function automatically whenever referenced Signals update.
-
-```javascript
-import { signal, effect } from "primaljs";
-
-const theme = signal(localStorage.getItem("theme") || "dark");
-
-effect(() => {
-    localStorage.setItem("theme", theme.value);
-    document.body.className = `theme-${theme.value}`;
-});
-```
-
-### `batch()` — Atomic Multi-Field Updates
-
-`batch()` suppresses subscriber notifications during multiple Signal writes, executing a single batch update pass at the end.
-
-```javascript
-import { signal, batch } from "primaljs";
-
-const firstName = signal("Lemuel");
-const lastName = signal("Adane");
-
-function resetForm() {
-    batch(() => {
-        firstName.value = "";
-        lastName.value = "";
-    });
-}
-```
-
-### `untrack()` — Silent Signal Reads
-
-`untrack()` reads a Signal value inside a computed or effect without creating a reactive dependency subscription.
-
-```javascript
-import { signal, computed, untrack } from "primaljs";
-
-const query = signal("");
-const category = signal("all");
-
-const searchResults = computed(() => {
-    const q = query.value.toLowerCase();
-    // Reads category silently without subscribing to category changes
-    const cat = untrack(() => category.value);
-    return items.filter(i => i.cat === cat && i.name.includes(q));
-});
-```
-
-### `ref()` — Direct DOM References
-
-`ref()` creates an element reference object (`ref.current`) bound to the underlying native DOM node after component mounting.
-
-```javascript
-import { html, ref, onMount } from "primaljs";
-
-function SearchInput() {
-    const inputRef = ref();
-
-    onMount(() => {
-        if (inputRef.current) inputRef.current.focus();
-    });
-
-    return html`<input ref=${inputRef} type="text" placeholder="Search..." />`;
-}
-```
-
-## Dynamic Component Switcher
-
-### `<Load>` — Dynamic Component Switcher
-
-> **Distinction (`mount()` vs `<Load>`)**:
-> - `mount(Component, target, options)` is the **imperative application entry function** used to attach a root component to a target DOM container (e.g., `mount(App, "#app")`).
-> - `<Load component=${activeTab} />` is the **declarative component tag** used inside templates to dynamically switch active components in an owned real-DOM range without rerunning the parent component (`executions === 1`).
-
-Mounts dynamic component references in an owned DOM range without re-executing the enclosing parent component function (`executions === 1`).
-
-```javascript
-import { html, signal, Load } from "primaljs";
-
-function OverviewTab(props) { return html`<div>Overview: ${props.user.name}</div>`; }
-function SettingsTab(props) { return html`<div>Settings: ${props.user.name}</div>`; }
-
-const activeTab = signal(OverviewTab);
-const user = signal({ name: "Lemuel" });
-
-html`
-    <div class="tabs">
-        <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
-        <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
-
-        <Load component=${activeTab} user=${user} />
-    </div>
-`
-```
-
----
-
-## Client-Side SPA Router & Layouts
-
-A feature-complete client-side router with nested layouts, route guards (`beforeEnter`), dynamic parameter extraction (`useRoute`), and dynamic SEO head management.
-
-```javascript
-import {
-    createApp,
-    createRouter,
-    RouteOutlet,
-    useRoute,
-    navigate,
-    head,
-    html
-} from "primaljs";
-
-function AppLayout() {
-    return html`
-        <div class="app-layout">
-            <nav>
-                <button onclick=${() => navigate("/")}>Home</button>
-                <button onclick=${() => navigate("/users/101")}>User 101</button>
-            </nav>
-            <main>
-                <RouteOutlet />
-            </main>
-        </div>
-    `;
-}
-
-function UserDetail() {
-    const route = useRoute();
-
-    head({
-        title: `User Profile #${route.params.id} | My App`,
-        description: `Profile page for User ${route.params.id}`
-    });
-
-    return html`<h2>User Profile ID: ${route.params.id}</h2>`;
-}
-
-const router = createRouter({
-    routes: [
-        {
-            path: "/",
-            component: AppLayout,
-            children: [
-                { path: "", component: () => html`<h2>Home Page</h2>` },
-                { path: "users/:id", component: UserDetail }
-            ]
-        }
-    ]
-});
-
-const app = createApp({ router });
-app.mount("#app");
-```
-
----
-
-## SEO & Pre-rendered DOM Activation
-
-PrimalJS is designed to support SEO-friendly pre-rendering and server-rendered DOM activation.
-
-### `head()` — Dynamic Head Metadata
-
-Dynamically manages document `<title>`, meta tags, OpenGraph cards, canonical links, and JSON-LD structured data on route transitions.
-
-```javascript
-import { head } from "primaljs";
-
-// Primary flat options API:
-head({
-    title: "Product Detail | My Store",
-    description: "High quality software components.",
-    image: "https://example.com/og.png",
-    robots: "index, follow",
-    canonical: "https://example.com/product",
-    jsonLd: { "@context": "https://schema.org", "@type": "Product", name: "Widget" }
-});
-
-// Advanced custom meta/link tags array API:
-head({
-    title: "Product Detail | My Store",
-    meta: [
-        { name: "keywords", content: "framework, javascript, reactive" },
-        { property: "og:type", content: "website" }
-    ],
-    link: [
-        { rel: "alternate", href: "https://example.com/fr/product" }
-    ]
-});
-```
-
-### `activate()` — Zero-Flash Hydration
-
-Attaches Signals, reactive effects, and event listeners directly to pre-rendered HTML DOM nodes **without clearing `innerHTML`** or causing layout flashes.
-
-```javascript
-import { activate } from "primaljs";
-
-// Attaches behavior to existing server-rendered DOM
-activate(App, "#app");
-```
-
----
-
-## Zero-Dependency PWA Management
-
-PrimalJS includes built-in Service Worker registration and cache management without external dependencies:
-
-```javascript
-import { setupPwa, unregisterServiceWorkers } from "primaljs";
-
-// Register Service Worker
-setupPwa({
-    swPath: "./sw.js",
-    updateStrategy: "prompt",
-    onUpdateAvailable() {
-        if (confirm("New update available. Reload?")) {
-            window.location.reload();
-        }
-    }
-});
-
-// Disable Service Worker & clear caches
-unregisterServiceWorkers("./sw.js");
-```
-
----
-
-## Security & XSS Prevention
-
-PrimalJS is built with strict security defaults to protect applications against Cross-Site Scripting (XSS) and protocol injection vulnerabilities:
-
-### 1. Safe-by-Default HTML Escaping
-All dynamic string values interpolated inside tagged template literals (`html\`<div>${userInput}</div>\``) are converted into DOM Text Nodes using `document.createTextNode()`. Raw HTML strings, `<script>` tags, or malicious attributes like `<img src=x onerror=alert(1)>` are rendered harmlessly as plain text.
-
-### 2. Explicit Raw HTML (`unsafeHtml`)
-To render unescaped HTML content (such as rich text editor output), developers must explicitly use `unsafeHtml(trustedHtml)`:
-
-```javascript
-import { html, unsafeHtml } from "primaljs";
-
-// WARNING: Always sanitize untrusted HTML (e.g., using DOMPurify) before passing to unsafeHtml()
-const userBio = DOMPurify.sanitize(rawHtmlInput);
-
-function UserProfile() {
-    return html`<div class="bio">${unsafeHtml(userBio)}</div>`;
-}
-```
-
-### 3. Automatic URL Protocol Sanitization
-PrimalJS automatically inspects URL attributes (`href`, `src`, `action`, `formaction`, `data`) bound via template expressions. Dangerous URL protocol schemes (`javascript:`, `vbscript:`, `data:text/html`) are neutralized automatically to `"about:blank"` to block script execution attacks.
 
 ---
 
@@ -446,14 +185,14 @@ PrimalJS automatically inspects URL attributes (`href`, `src`, `action`, `formac
 PrimalJS enforces strict architectural guarantees across its test suite:
 
 - **Single Component Execution**: Component functions execute **exactly once** (`executions === 1`) on mount. Routine state changes mutate real DOM targets directly.
-- **DOM Identity Preservation**: Target DOM element instances remain untouched when state changes.
+- **DOM Identity & Focus Preservation**: Target DOM element instances remain untouched when state changes, preserving input focus and text selections.
 - **Root Disposal**: `mount()` returns `{ dispose() }` for idempotent teardown of DOM nodes, event listeners, and subscriptions.
 - **Application Instance Scope**: PrimalJS assumes one primary root `createApp()` application per browser document for top-level window error event handling scope.
 
 ### Running Tests
 
 ```bash
-# Run unit & integration test suite (81/81 passing)
+# Run unit & integration test suite (87/87 passing)
 npm run test:unit
 
 # Run cross-browser suite targeting Chromium, Firefox, WebKit, Edge, and mobile Chromium
@@ -463,36 +202,31 @@ npm run test:e2e:cross
 npm run test:e2e
 ```
 
-### Full Matrix Verification Status
+### Accurate Browser Verification Matrix
 
-GitHub Actions CI installs Playwright binaries (`npx playwright install --with-deps chromium firefox webkit`) to verify active browser engines. In local environments lacking specific system binaries (such as Edge on Linux), uninstalled browser targets are gracefully skipped while active installed engines pass.
+- **Chromium Engine**: Tested & Passed
+- **Firefox Engine**: Tested & Passed
+- **WebKit / Safari Engine**: Tested & Passed
+- **Mobile Chromium Emulation**: Tested & Passed
+- **Actual Microsoft Edge**: Not guaranteed by current local runner (requires system installation)
+- **Actual Samsung Internet**: Not tested
 
 ```text
 === MATRIX REPEATED PASS 1 ===
-ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
 ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
 ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 2 ===
-ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
 ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
 ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 3 ===
-ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
 ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
 ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 ```
-
----
-
-## Credits & Attribution
-
-PrimalJS is created and maintained through a unique collaborative AI-assisted engineering workflow:
-
-- **Author & Vision:** Lemuel Adane
-- **Code & Architecture:** Google Antigravity
-- **Product Testing & Quality Assurance:** ChatGPT
 
 ---
 

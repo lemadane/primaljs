@@ -87,23 +87,38 @@ function findCapitalTagNames(htmlStr) {
 function compileTemplate(strings) {
     let rawHtml = "";
     const bindingSpecs = [];
+    let mutableStrings = Array.from(strings);
 
-    for (let i = 0; i < strings.length; i++) {
-        rawHtml += strings[i];
-        if (i < strings.length - 1) {
-            const matchAttr = rawHtml.match(/([a-zA-Z0-9_-]+)\s*=\s*['"]?$/);
+    for (let i = 0; i < mutableStrings.length; i++) {
+        rawHtml += mutableStrings[i];
+        if (i < mutableStrings.length - 1) {
+            const matchAttr = rawHtml.match(/([a-zA-Z0-9_-]+)\s*=\s*(["']?)([^"'>]*)$/);
             if (matchAttr) {
                 const attrName = matchAttr[1];
+                const quote = matchAttr[2];
+                const prefix = matchAttr[3] || "";
+                let suffix = "";
+
+                if (quote && mutableStrings[i + 1]) {
+                    const suffixMatch = mutableStrings[i + 1].match(new RegExp(`^(.*?)${quote}`));
+                    if (suffixMatch) {
+                        suffix = suffixMatch[1];
+                        mutableStrings[i + 1] = mutableStrings[i + 1].slice(suffix.length + quote.length);
+                    }
+                }
+
                 const markerAttr = `primal-attr-${i}`;
-                rawHtml = rawHtml.replace(
-                    new RegExp(`${attrName}\\s*=\\s*['"]?$`),
-                    `${markerAttr}="${attrName}"`
-                );
+                const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+                const replacePattern = new RegExp(`${escapeRegExp(attrName)}\\s*=\\s*${quote ? quote : ''}${escapeRegExp(prefix)}$`);
+                rawHtml = rawHtml.replace(replacePattern, `${markerAttr}="${attrName}" `);
+
                 bindingSpecs.push({
                     type: "attribute",
                     valueIndex: i,
                     attrName: attrName,
-                    markerAttr: markerAttr
+                    markerAttr: markerAttr,
+                    prefix: prefix,
+                    suffix: suffix
                 });
             } else {
                 const markerComment = `<!--primal-ph-${i}-->`;
@@ -155,12 +170,15 @@ function compileTemplate(strings) {
                     if (attr.name.startsWith("primal-attr-")) {
                         const index = parseInt(attr.name.replace("primal-attr-", ""), 10);
                         const targetAttrName = attr.value;
+                        const spec = bindingSpecs.find(s => s.valueIndex === index);
                         instructions.push({
                             type: targetAttrName.toLowerCase().startsWith("on")
                                 ? "event"
                                 : "attribute",
                             attrName: targetAttrName,
                             valueIndex: index,
+                            prefix: spec ? spec.prefix : "",
+                            suffix: spec ? spec.suffix : "",
                             path: [...path]
                         });
                         attrsToRemove.push(attr.name);
@@ -239,7 +257,7 @@ export function renderTemplate(templateResult, parentCtx = getCurrentContext()) 
         } else if (spec.type === "event") {
             bindEvent(targetNode, spec.attrName, val, parentCtx);
         } else if (spec.type === "attribute") {
-            bindAttribute(targetNode, spec.attrName, val, parentCtx);
+            bindAttribute(targetNode, spec.attrName, val, parentCtx, spec.prefix, spec.suffix);
         } else if (spec.type === "component") {
             instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, parentCtx, cached.capitalTags);
         }
@@ -310,7 +328,7 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
         } else if (spec.type === "event" || (spec.type === "attribute" && spec.attrName.toLowerCase().startsWith("on"))) {
             bindEvent(targetNode, spec.attrName, val, ctx);
         } else if (spec.type === "attribute") {
-            bindAttribute(targetNode, spec.attrName, val, ctx);
+            bindAttribute(targetNode, spec.attrName, val, ctx, spec.prefix, spec.suffix);
         } else if (spec.type === "component") {
             instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, ctx, cached.capitalTags);
         }
@@ -339,6 +357,108 @@ function bindContent(targetNode, value, ctx) {
     parent.replaceChild(replacementNode, targetNode);
 }
 
+function getKey(item, idx) {
+    if (item === null || item === undefined) return idx;
+    if (item instanceof TemplateResult) {
+        for (let i = 0; i < item.strings.length; i++) {
+            if (/key\s*=\s*['"]?$/i.test(item.strings[i]) && i < item.values.length) {
+                return item.values[i];
+            }
+        }
+    }
+    if (typeof item === "object") {
+        if ("key" in item) return item.key;
+        if ("id" in item) return item.id;
+    }
+    return item;
+}
+
+function reconcileList(startAnchor, endAnchor, newItems, oldItemMap, parentCtx) {
+    const parent = startAnchor.parentNode;
+    if (!parent) return;
+
+    const newItemMap = new Map();
+    const nextItemNodes = [];
+
+    for (let i = 0; i < newItems.length; i++) {
+        const itemVal = newItems[i];
+        const key = getKey(itemVal, i);
+        let record = oldItemMap.get(key);
+
+        if (record) {
+            oldItemMap.delete(key);
+            if (itemVal instanceof TemplateResult && record.domNode) {
+                activateTemplate(record.domNode, itemVal, record.itemCtx);
+            }
+        } else {
+            const itemCtx = new ComponentContext("ListItem");
+            if (parentCtx) {
+                itemCtx.parent = parentCtx;
+                if (!parentCtx.children.includes(itemCtx)) {
+                    parentCtx.children.push(itemCtx);
+                }
+                itemCtx.templateValues = parentCtx.templateValues;
+                itemCtx.capitalTags = parentCtx.capitalTags;
+            }
+
+            pushContext(itemCtx);
+            let domNode;
+            try {
+                domNode = convertToDOMNode(itemVal, itemCtx);
+                if (domNode && domNode.nodeType === Node.DOCUMENT_FRAGMENT_NODE && domNode.childNodes.length > 0) {
+                    const validNodes = Array.from(domNode.childNodes).filter(n => n.nodeType !== Node.TEXT_NODE || n.nodeValue.trim().length > 0);
+                    domNode = validNodes.length === 1 ? validNodes[0] : (validNodes.length > 0 ? validNodes : domNode);
+                }
+                triggerMount(itemCtx);
+            } finally {
+                popContext();
+            }
+
+            record = { key, domNode, itemCtx };
+        }
+
+        newItemMap.set(key, record);
+        nextItemNodes.push(record.domNode);
+    }
+
+    for (const record of oldItemMap.values()) {
+        if (record.itemCtx) {
+            if (parentCtx && parentCtx.children) {
+                const idx = parentCtx.children.indexOf(record.itemCtx);
+                if (idx !== -1) parentCtx.children.splice(idx, 1);
+            }
+            destroyContext(record.itemCtx);
+        }
+        if (record.domNode) {
+            const nodes = Array.isArray(record.domNode) ? record.domNode : [record.domNode];
+            for (const n of nodes) {
+                if (n && n.parentNode === parent) {
+                    parent.removeChild(n);
+                }
+            }
+        }
+    }
+
+    oldItemMap.clear();
+    for (const [k, v] of newItemMap.entries()) {
+        oldItemMap.set(k, v);
+    }
+
+    let currentMarker = startAnchor;
+    for (const itemNode of nextItemNodes) {
+        if (!itemNode) continue;
+        const nodes = Array.isArray(itemNode) ? itemNode : [itemNode];
+        for (const n of nodes) {
+            if (n) {
+                if (currentMarker.nextSibling !== n) {
+                    parent.insertBefore(n, currentMarker.nextSibling);
+                }
+                currentMarker = n;
+            }
+        }
+    }
+}
+
 function createValueNode(value, ctx) {
     if (isSignal(value)) {
         const textNode = document.createTextNode(value.value ?? "");
@@ -356,6 +476,7 @@ function createValueNode(value, ctx) {
         frag.appendChild(endAnchor);
 
         let activeCtx = null;
+        let oldItemMap = new Map();
 
         const cleanupActiveCtx = () => {
             if (activeCtx) {
@@ -366,14 +487,41 @@ function createValueNode(value, ctx) {
                 destroyContext(activeCtx);
                 activeCtx = null;
             }
+            for (const record of oldItemMap.values()) {
+                if (record.itemCtx) {
+                    if (ctx && ctx.children) {
+                        const idx = ctx.children.indexOf(record.itemCtx);
+                        if (idx !== -1) ctx.children.splice(idx, 1);
+                    }
+                    destroyContext(record.itemCtx);
+                }
+            }
+            oldItemMap.clear();
         };
 
         const disposer = effect(() => {
+            const res = value();
+            if (res === null || res === undefined) {
+                cleanupActiveCtx();
+                clearAnchorRange(startAnchor, endAnchor);
+                return;
+            }
+
+            if (Array.isArray(res)) {
+                if (activeCtx) {
+                    if (ctx && ctx.children) {
+                        const idx = ctx.children.indexOf(activeCtx);
+                        if (idx !== -1) ctx.children.splice(idx, 1);
+                    }
+                    destroyContext(activeCtx);
+                    activeCtx = null;
+                }
+                reconcileList(startAnchor, endAnchor, res, oldItemMap, ctx);
+                return;
+            }
+
             cleanupActiveCtx();
             clearAnchorRange(startAnchor, endAnchor);
-
-            const res = value();
-            if (res === null || res === undefined) return;
 
             activeCtx = new ComponentContext("DynamicFn");
             if (ctx) {
@@ -409,8 +557,8 @@ function createValueNode(value, ctx) {
             const tValues = (ctx && ctx.templateValues) ? ctx.templateValues : [];
             const cTags = (ctx && ctx.capitalTags) ? ctx.capitalTags : new Set();
             const tagUpper = value.nodeName.toUpperCase();
-
-            if (cTags.has(tagUpper) || value.hasAttribute("primal-comp")) {
+            const cleanTagName = value.getAttribute("primal-comp") || value.nodeName.replace(/-COMPONENT$/i, "");
+            if (getComponent(cleanTagName) || getComponent(tagUpper) || value.hasAttribute("primal-comp")) {
                 const cleanName = value.getAttribute("primal-comp") || value.nodeName.replace(/-COMPONENT$/i, "");
                 const subComp = getComponent(cleanName);
                 if (subComp) {
@@ -489,7 +637,7 @@ function bindEvent(targetElement, attrName, handler, ctx) {
     }
 }
 
-function bindAttribute(targetElement, attrName, value, ctx) {
+function bindAttribute(targetElement, attrName, value, ctx, prefix = "", suffix = "") {
     if (attrName.startsWith("on") && (typeof value === "function" || isSignal(value))) {
         bindEvent(targetElement, attrName, value, ctx);
         return;
@@ -520,13 +668,27 @@ function bindAttribute(targetElement, attrName, value, ctx) {
         return;
     }
 
-    if (isSignal(value)) {
+    const computeVal = (v) => {
+        let raw = v;
+        if (typeof v === "function") {
+            raw = v();
+        } else if (isSignal(v)) {
+            raw = v.value;
+        }
+        if (raw === null || raw === undefined || raw === false) {
+            if (!prefix && !suffix) return raw;
+            raw = "";
+        }
+        return (prefix || suffix) ? `${prefix}${raw}${suffix}` : raw;
+    };
+
+    if (typeof value === "function" || isSignal(value)) {
         const disposer = effect(() => {
-            setElementAttribute(targetElement, attrName, value.value);
+            setElementAttribute(targetElement, attrName, computeVal(value));
         });
         if (ctx) ctx.addEffect(disposer);
     } else {
-        setElementAttribute(targetElement, attrName, value);
+        setElementAttribute(targetElement, attrName, computeVal(value));
     }
 }
 

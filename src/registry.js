@@ -3,7 +3,7 @@
  */
 
 import { Load } from "./mount.js";
-
+import { Boundary } from "./boundary.js";
 
 const registry = new Map();
 
@@ -51,7 +51,7 @@ export function clearRegistry() {
 
 
 function registerDefaultComponents() {
-    register(Load);
+    register(Load, Boundary);
 }
 
 registerDefaultComponents();

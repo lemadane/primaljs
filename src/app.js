@@ -41,8 +41,24 @@ export function reportGlobalError(error, context = {}) {
     }
     isHandlingGlobalError = true;
     try {
-        let handled = false;
+        let handledLocally = false;
+        let current = context.ctx || context.owner;
+        while (current) {
+            if (typeof current.localErrorHandler === "function") {
+                const res = current.localErrorHandler(error, context);
+                if (res) {
+                    handledLocally = true;
+                    break;
+                }
+            }
+            current = current.parent;
+        }
 
+        if (handledLocally) {
+            return true;
+        }
+
+        let handled = false;
         const targetCtx = context.ctx || context.owner;
         if (targetCtx && typeof targetCtx.appOnError === "function") {
             targetCtx.appOnError(error, context);
@@ -63,8 +79,10 @@ export function reportGlobalError(error, context = {}) {
         if (!handled) {
             console.error("PrimalJS Uncaught Error:", error, context);
         }
+        return false;
     } catch (handlerErr) {
         console.error("PrimalJS: Unhandled exception inside custom onError handler:", handlerErr, "Original error:", error);
+        return false;
     } finally {
         isHandlingGlobalError = false;
     }

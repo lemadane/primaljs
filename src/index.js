@@ -15,4 +15,5 @@ export { head } from "./seo.js";
 export { activate } from "./activate.js";
 export { setupPwa, unregisterServiceWorkers } from "./pwa.js";
 export { createApp } from "./app.js";
+export { Boundary } from "./boundary.js";
 export { PrimalJSError, setDevMode } from "./diagnostics.js";
