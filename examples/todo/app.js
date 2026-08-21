@@ -1,3 +1,4 @@
+// @ts-nocheck
 import { html, signal, computed, mount } from "../../primal.js";
 
 function TodoApp() {
@@ -51,21 +52,19 @@ function TodoApp() {
             </form>
 
             <ul class="todo-list">
-                <For each=${todos} key=${todo => todo.id}>
-                    ${item => html`
-                        <li class="todo-item ${item.done ? "completed" : ""}">
-                            <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
-                                <input
-                                    type="checkbox"
-                                    checked=${item.done}
-                                    onchange=${() => toggleTodo(item.id)}
-                                />
-                                <span>${item.text}</span>
-                            </label>
-                            <button class="del-btn" onclick=${() => removeTodo(item.id)}>✕</button>
-                        </li>
-                    `}
-                </For>
+                ${() => todos.value.map(item => html`
+                    <li class="todo-item ${item.done ? "completed" : ""}">
+                        <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
+                            <input
+                                type="checkbox"
+                                checked=${item.done}
+                                onchange=${() => toggleTodo(item.id)}
+                            />
+                            <span>${item.text}</span>
+                        </label>
+                        <button class="del-btn" onclick=${() => removeTodo(item.id)}>✕</button>
+                    </li>
+                `)}
             </ul>
         </div>
     `;

@@ -6,6 +6,13 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
 
 ---
 
+### **Credits & Attribution**
+- **Authored & Designed by:** Lemuel Adane
+- **Coded & Architecture by:** Google Antigravity
+- **Product Tested & QA by:** ChatGPT
+
+---
+
 ## Table of Contents
 
 - [Core Principles](#core-principles)
@@ -19,19 +26,14 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
   - [`batch()` — Atomic Multi-Field Updates](#batch--atomic-multi-field-updates)
   - [`untrack()` — Silent Signal Reads](#untrack--silent-signal-reads)
   - [`ref()` — Direct DOM References](#ref--direct-dom-references)
-- [Declarative Control Flow Tags](#declarative-control-flow-tags)
-  - [`<If>`, `<ElseIf>`, `<Else>` — Conditionals](#if-elseif-else--conditionals)
-  - [`<Switch>`, `<Case>`, `<Default>` — Branch Matching](#switch-case-default--branch-matching)
-  - [`<For>`, `<Continue />`, `<Break />`, `<Else>` — Keyed Loops](#for-continue-break-else--keyed-loops)
-  - [`<Delay>`, `<Wait>`, `<Briefly>`, `<Failed>` — Expressive Async Controls](#delay-wait-briefly-failed--expressive-async-controls)
-  - [`<Mount>` — Dynamic Component Switcher](#mount--dynamic-component-switcher)
-  - [`<Try>`, `<Catch>` — UI Error Boundaries](#try-catch--ui-error-boundaries)
+- [`<Load>` — Dynamic Component Switcher](#load--dynamic-component-switcher)
 - [Client-Side SPA Router & Layouts](#client-side-spa-router--layouts)
 - [SEO & Pre-rendered DOM Activation](#seo--pre-rendered-dom-activation)
   - [`head()` — Dynamic Head Metadata](#head--dynamic-head-metadata)
   - [`activate()` — Zero-Flash Hydration](#activate--zero-flash-hydration)
 - [Zero-Dependency PWA Management](#zero-dependency-pwa-management)
 - [Architecture & Verification](#architecture--verification)
+- [Credits & Attribution](#credits--attribution)
 - [License](#license)
 
 ---
@@ -252,151 +254,18 @@ function SearchInput() {
 }
 ```
 
----
+## Dynamic Component Switcher
 
-## Declarative Control Flow Tags
+### `<Load>` — Dynamic Component Switcher
 
-### `<If>`, `<ElseIf>`, `<Else>` — Conditionals
-
-Swaps real DOM node ranges directly when condition expressions change, without re-executing enclosing parent component functions.
-
-```javascript
-import { html, signal, If, ElseIf, Else } from "primaljs";
-
-const userRole = signal("admin");
-
-html`
-    <If when=${() => userRole.value === "admin"}>
-        <AdminDashboard />
-        <ElseIf when=${() => userRole.value === "editor"}>
-            <EditorDashboard />
-        </ElseIf>
-        <Else>
-            <GuestView />
-        </Else>
-    </If>
-`
-```
-
-### `<Switch>`, `<Case>`, `<Default>` — Branch Matching
-
-Matches single values, arrays of values, or predicate functions with strict first-match-wins ordering (no fallthrough, no `break` tags required).
-
-```javascript
-import { html, signal, Switch, Case, Default } from "primaljs";
-
-const status = signal("in_progress");
-
-html`
-    <Switch value=${status}>
-        <Case value="completed">
-            <span class="badge success">Completed</span>
-        </Case>
-        <Case value=${["in_progress", "pending"]}>
-            <span class="badge warning">Processing...</span>
-        </Case>
-        <Case value=${v => typeof v === "number" && v > 100}>
-            <span class="badge info">High Priority</span>
-        </Case>
-        <Default>
-            <span class="badge secondary">Unknown Status</span>
-        </Default>
-    </Switch>
-`
-```
-
-### `<For>`, `<Continue />`, `<Break />`, `<Else>` — Keyed Loops
-
-Fine-grained keyed DOM reconciliation. Re-orders, appends, or removes target DOM item nodes directly when array data mutates.
-
-```javascript
-import { html, signal, For, Continue, Break, Else } from "primaljs";
-
-const users = signal([
-    { id: 1, name: "Lemuel", active: true, sysAdmin: false },
-    { id: 2, name: "Sarah", active: true, sysAdmin: true },
-    { id: 3, name: "Marcus", active: false, sysAdmin: false }
-]);
-
-html`
-    <For each=${users} key=${u => u.id}>
-        ${(user, index) => html`
-            <Continue when=${() => !user.active} />
-            <Break when=${() => user.sysAdmin} />
-            <div class="user-card">
-                <span>#${index() + 1}: ${user.name}</span>
-            </div>
-        `}
-        <Else>
-            <p>No active users found.</p>
-        </Else>
-    </For>
-`
-```
-
-### `<Delay>`, `<Wait>`, `<Briefly>`, `<Failed>` — Expressive Async Controls
-
-Human-first plain-English control flow for handling async operations, promises, and dynamic component loading.
-
-```javascript
-import { html, signal, Delay, Wait, Briefly, Failed } from "primaljs";
-
-const userId = signal(1);
-
-const fetchUserData = (id, { signal }) => {
-    return fetch(`/api/users/${id}`, { signal }).then(res => res.json());
-};
-
-html`
-    <!-- <Delay> automatically re-triggers when Signals inside task change -->
-    <Delay task=${({ signal }) => fetchUserData(userId.value, { signal })}>
-        ${user => html`
-            <div class="profile-card">
-                <h3>${user.name}</h3>
-                <p>Email: ${user.email}</p>
-            </div>
-        `}
-        <Briefly>
-            <div class="loading">Fetching user data...</div>
-        </Briefly>
-        <Failed>
-            ${(err, retry) => html`
-                <div class="error">
-                    <p>Failed: ${err.message}</p>
-                    <button onclick=${retry}>Retry Request</button>
-                </div>
-            `}
-        </Failed>
-    </Delay>
-`
-```
-
-#### Unwrapping Single Promises (`<Wait>`):
-
-```javascript
-const analyticsPromise = fetch("/api/analytics").then(res => res.json());
-
-html`
-    <Wait for=${analyticsPromise}>
-        ${data => html`<h3>Total Visits: ${data.visits}</h3>`}
-        <Briefly><p>Loading analytics...</p></Briefly>
-        <Failed>${err => html`<p>Error: ${err.message}</p>`}</Failed>
-    </Wait>
-`
-```
-
-> **Backward Compatibility**: `Async`, `Await`, `Pending`, and `Catch` remain exported as fully functional aliases.
-
-### `<Mount>` — Dynamic Component Switcher
-
-> **Distinction (`mount()` vs `<Mount>`)**:
+> **Distinction (`mount()` vs `<Load>`)**:
 > - `mount(Component, target, options)` is the **imperative application entry function** used to attach a root component to a target DOM container (e.g., `mount(App, "#app")`).
-> - `<Mount component=${activeTab} />` is the **declarative component tag** used inside templates to dynamically switch active components in an owned real-DOM range without rerunning the parent component (`executions === 1`).
+> - `<Load component=${activeTab} />` is the **declarative component tag** used inside templates to dynamically switch active components in an owned real-DOM range without rerunning the parent component (`executions === 1`).
 
 Mounts dynamic component references in an owned DOM range without re-executing the enclosing parent component function (`executions === 1`).
 
 ```javascript
-import { html, signal, Mount } from "primaljs";
+import { html, signal, Load } from "primaljs";
 
 function OverviewTab(props) { return html`<div>Overview: ${props.user.name}</div>`; }
 function SettingsTab(props) { return html`<div>Settings: ${props.user.name}</div>`; }
@@ -409,39 +278,8 @@ html`
         <button onclick=${() => activeTab.value = OverviewTab}>Overview</button>
         <button onclick=${() => activeTab.value = SettingsTab}>Settings</button>
 
-        <Mount component=${activeTab} user=${user} />
+        <Load component=${activeTab} user=${user} />
     </div>
-`
-```
-
-### `<Try>`, `<Catch>` — UI Error Boundaries
-
-Protects applications from full crashes by trapping render exceptions, lifecycle failures, and computed Signal errors inside protective boundaries.
-
-```javascript
-import { html, signal, Try, Catch } from "primaljs";
-
-const shouldFail = signal(false);
-
-function Widget() {
-    if (shouldFail.value) throw new Error("Widget rendering crashed!");
-    return html`<div>Widget Content Loaded</div>`;
-}
-
-html`
-    <Try>
-        <Widget />
-        <Catch>
-            ${(err, reset) => html`
-                <div class="error-box">
-                    <p>${err.message}</p>
-                    <button onclick=${() => { shouldFail.value = false; reset(); }}>
-                        Reset Boundary
-                    </button>
-                </div>
-            `}
-        </Catch>
-    </Try>
 `
 ```
 
@@ -615,7 +453,7 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 ### Running Tests
 
 ```bash
-# Run unit & integration test suite (134/134 passing)
+# Run unit & integration test suite (81/81 passing)
 npm run test:unit
 
 # Run cross-browser suite targeting Chromium, Firefox, WebKit, Edge, and mobile Chromium
@@ -631,23 +469,33 @@ GitHub Actions CI installs Playwright binaries (`npx playwright install --with-d
 
 ```text
 === MATRIX REPEATED PASS 1 ===
-ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
-ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
+ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
+ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 2 ===
-ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
-ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
+ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
+ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 
 === MATRIX REPEATED PASS 3 ===
-ℹ tests 143 unit | pass 143 | fail 0 | 0 errors
-ℹ tests 9 e2e     | pass 9   | fail 0 | 0 errors
-ℹ tests 5 cross   | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
+ℹ tests 81 unit | pass 81 | fail 0 | 0 errors
+ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
+ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
 ```
+
+---
+
+## Credits & Attribution
+
+PrimalJS is created and maintained through a unique collaborative AI-assisted engineering workflow:
+
+- **Author & Vision:** Lemuel Adane
+- **Code & Architecture:** Google Antigravity
+- **Product Testing & Quality Assurance:** ChatGPT
 
 ---
 
 ## License
 
-[MIT License](LICENSE) © PrimalJS Team
+[MIT License](LICENSE) © Lemuel Adane & PrimalJS Contributors

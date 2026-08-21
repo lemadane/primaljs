@@ -5,9 +5,8 @@
 
 import { signal, computed, batch } from "./signal.js";
 import { html } from "./html.js";
-import { Mount } from "./mount.js";
+import { Load } from "./mount.js";
 import { head } from "./seo.js";
-import { Delay } from "./control_flow.js";
 import { getCurrentContext, pushContext, popContext } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";
 import { register } from "./registry.js";
@@ -37,23 +36,19 @@ export function lazy(factory) {
         if (cachedComponent) {
             return typeof cachedComponent === "function" ? cachedComponent(props) : cachedComponent;
         }
-        return Delay({
-            task: () => {
-                if (!pendingPromise) {
-                    pendingPromise = Promise.resolve().then(() => factory()).then(mod => {
-                        cachedComponent = (mod && mod.default) || mod;
-                        return mod;
-                    });
-                }
-                return pendingPromise;
-            },
-            children: [
-                (mod) => {
-                    const Comp = (mod && mod.default) || mod;
-                    return typeof Comp === "function" ? Comp(props) : Comp;
-                }
-            ]
-        });
+        const compSignal = signal(null);
+        if (!pendingPromise) {
+            pendingPromise = Promise.resolve().then(() => factory()).then(mod => {
+                cachedComponent = (mod && mod.default) || mod;
+                compSignal.value = cachedComponent;
+                return mod;
+            });
+        } else {
+            pendingPromise.then(() => {
+                compSignal.value = cachedComponent;
+            });
+        }
+        return html`<Load component=${compSignal} />`;
     };
 
     LazyWrapper.__isLazy = true;
@@ -146,7 +141,7 @@ export function RouteOutlet(props) {
         return RouteWrapper;
     });
 
-    return html`<Mount component=${comp} />`;
+    return html`<Load component=${comp} />`;
 }
 
 let globalRouterInstance = null;
@@ -205,7 +200,7 @@ export function navigate(to, options) {
 }
 
 register(RouteOutlet);
-register(Mount);
+register(Load);
 
 
 function matchSegment(pattern, segment) {

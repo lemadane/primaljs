@@ -41,16 +41,16 @@ function insertAfterAnchor(startAnchor, domNode) {
  */
 
 /**
- * Declarative `<Mount>` Component Helper.
+ * Declarative `<Load>` Component Helper.
  * Dynamically mounts a component in an owned real-DOM range without parent rerenders.
  *
  * @param {{ component: Component | import("./signal.js").Signal<Component> | null | undefined } & Record<string, any>} props
  * @returns {DocumentFragment}
  */
-export function Mount(props) {
+export function Load(props) {
     const ctx = getCurrentContext();
-    const startAnchor = document.createComment("primal:mount:start");
-    const endAnchor = document.createComment("primal:mount:end");
+    const startAnchor = document.createComment("primal:load:start");
+    const endAnchor = document.createComment("primal:load:end");
 
     const fragment = document.createDocumentFragment();
     fragment.appendChild(startAnchor);
@@ -82,7 +82,7 @@ export function Mount(props) {
         }
 
         if (typeof compFn !== "function") {
-            throw new Error("<Mount> 'component' prop must be a function component, Signal, null, or undefined.");
+            throw new Error("<Load> 'component' prop must be a function component, Signal, null, or undefined.");
         }
 
         if (compFn === activeCompFn) {
@@ -98,7 +98,6 @@ export function Mount(props) {
             if (!ctx.children.includes(activeCompCtx)) {
                 ctx.children.push(activeCompCtx);
             }
-            if (ctx.tryBoundary) activeCompCtx.tryBoundary = ctx.tryBoundary;
             if (ctx.templateValues) activeCompCtx.templateValues = ctx.templateValues;
             if (ctx.capitalTags) activeCompCtx.capitalTags = ctx.capitalTags;
         }
@@ -106,7 +105,7 @@ export function Mount(props) {
         const forwardedProps = {};
         if (props) {
             for (const key of Object.keys(props)) {
-                if (key !== "component" && key !== "__templateValues" && key !== "__capitalTags" && key !== "__isControlFlowChild") {
+                if (key !== "component" && key !== "__templateValues" && key !== "__capitalTags") {
                     forwardedProps[key] = props[key];
                 }
             }

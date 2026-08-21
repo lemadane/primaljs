@@ -2,7 +2,7 @@
     "compilerOptions": {
         "target": "ES2024",
         "module": "ESNext",
-        "moduleResolution": "Node",
+        "moduleResolution":"bundler",
         "checkJs": true,
         "strict": true,
         "allowJs": true

@@ -17,7 +17,6 @@ export class ComponentContext extends Owner {
         /** @type {ComponentContext | null} */
         this.parent = contextStack.length > 0 ? contextStack[contextStack.length - 1] : null;
         if (this.parent) {
-            this.tryBoundary = this.parent.tryBoundary;
             this.appOnError = this.parent.appOnError;
             if (!this.parent.children.includes(this)) {
                 this.parent.children.push(this);
@@ -100,11 +99,7 @@ export function triggerMount(ctx) {
         try {
             hook();
         } catch (err) {
-            if (ctx.tryBoundary && typeof ctx.tryBoundary.handleError === "function" && !ctx.tryBoundary.isDestroyed) {
-                ctx.tryBoundary.handleError(err);
-            } else {
-                reportGlobalError(err, { type: "onMount", component: ctx.name });
-            }
+            reportGlobalError(err, { type: "onMount", component: ctx.name });
         }
     };
     ctx.mountHooks = [];

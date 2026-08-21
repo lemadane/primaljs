@@ -59,9 +59,7 @@ export function UserCard(props) {
         <article class="card">
             <h3>${props.name}</h3>
             <p>Age: ${props.age}</p>
-            <If when=${props.admin}>
-                <span class="badge">Admin</span>
-            </If>
+            ${props.admin ? html`<span class="badge">Admin</span>` : ""}
         </article>
     `;
 }
@@ -97,7 +95,7 @@ To enable aggressive VS Code JavaScript type checking across your PrimalJS appli
 
 ## 3. Template Language Layer (`html\`...\``)
 
-Inside PrimalJS `html\`...\`` template literals, standard HTML tags, attributes, and PrimalJS control flow tags (`<If>`, `<For>`, `<Mount>`, `<Wait>`, etc.) can be autocompleted in VS Code.
+Inside PrimalJS `html\`...\`` template literals, standard HTML tags, attributes, and PrimalJS component tags (`<Load>`, `<RouteOutlet>`) can be autocompleted in VS Code.
 
 ### Option A: VS Code Custom HTML Data
 
@@ -112,7 +110,7 @@ Inside PrimalJS `html\`...\`` template literals, standard HTML tags, attributes,
 }
 ```
 
-This enables hover info, tag completion, and attribute suggestions for built-in PrimalJS tags (`<If when=${...}>`, `<For each=${...} key=${...}>`, `<Mount component=${...}>`).
+This enables hover info, tag completion, and attribute suggestions for built-in PrimalJS tags (`<Load component=${...}>`).
 
 ### Option B: Inline HTML Extensions
 

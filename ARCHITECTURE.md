@@ -20,18 +20,18 @@ PrimalJS is a lightweight, modern JavaScript single-page application framework b
 
 ## 2. Shared Ownership & Resource Disposal Tree (`Owner`)
 
-All PrimalJS components, control-flow regions, router views, and async operations participate in a unified `Owner` hierarchy:
+All PrimalJS components, dynamic component switcher regions, router views, and async operations participate in a unified `Owner` hierarchy:
 
 ```text
 Application Root Owner (MountedApp)
    ├── Component Owner
    │     ├── Signals / Computed / Effects
    │     ├── Event Listeners & Ref Bindings (ref.current = null on disposal)
-   │     └── Child Owners (<If>, <For>, <Switch>, <Try>, <Mount>, <Async>, <Await>, <RouteOutlet>)
+   │     └── Child Owners (<Load>, <RouteOutlet>)
    └── Router Owner
 ```
 
-- **Root Disposal (`app.dispose()`)**: `mount(Component, target)` returns `{ dispose() }`. Recursively disposes all child contexts, reactive effects, event listeners, refs (`ref.current = null`), control flow regions, and DOM anchors. Idempotent and supports clean re-mounting.
+- **Root Disposal (`app.dispose()`)**: `mount(Component, target)` returns `{ dispose() }`. Recursively disposes all child contexts, reactive effects, event listeners, refs (`ref.current = null`), and DOM anchors. Idempotent and supports clean re-mounting.
 - **Deterministic Teardown**: Subtree replacements cleanly dismantle superseded DOM nodes and subscriptions without orphaned references or memory leaks.
 
 ---
@@ -63,17 +63,11 @@ Micro-Mutation on target Text / Attribute / Property
 
 ---
 
-## 5. Control-Flow Engines
+## 5. Dynamic Component Switcher
 
-PrimalJS provides first-class declarative control-flow components operating directly in native tagged templates without Virtual DOM or parent component rerenders:
+PrimalJS uses standard JavaScript control logic (`ternary`, `if/else`, `.map()`, `try/catch`) and provides dynamic component rendering via native tagged templates without Virtual DOM:
 
-1. **Conditional (`<If>`, `<ElseIf>`, `<Else>`)**: Real DOM range toggling based on standard JavaScript truthiness.
-2. **Switch (`<Switch>`, `<Case>`, `<Default>`)**: First-match-wins strict equality / predicate branch selection.
-3. **Loop (`<For>`, `<Continue />`, `<Break />`, `<Else>`)**: Keyed real-DOM item range reconciliation preserving DOM identity (`johnBefore === johnAfter`).
-4. **Error Boundary (`<Try>`, `<Catch>`)**: Real DOM range error catching for UI render, lifecycle, and event failures.
-5. **Component Switcher (`<Mount>`)**: Declarative dynamic component switching in native tagged templates (`<Mount component=${page} />`). Note: `<Mount>` is the declarative template component tag, distinct from the imperative application mounting function `mount(Component, target)`.
-6. **Async Loader (`<Async>`, `<Pending>`, `<Catch>`)**: Dynamic ES module loading (`import()`) with pending spinners and `(error, retry)` recovery.
-7. **Promise Awaiter (`<Await>`, `<Pending>`, `<Catch>`)**: Promise data awaiting with operation version tokens, native `AbortController` cancellation, and `(error, retry)` recovery.
+- **Component Switcher (`<Load>`)**: Declarative dynamic component switching in native tagged templates (`<Load component=${page} />`). Note: `<Load>` is the declarative template component tag, distinct from the imperative application mounting function `mount(Component, target)`.
 
 ---
 
@@ -105,6 +99,6 @@ PrimalJS provides first-class declarative control-flow components operating dire
 | :--- | :--- | :--- |
 | **Node Storage** | In-memory tree of JS objects (`VNode` / Fiber) | Real browser DOM nodes directly |
 | **State Update** | Component function re-executes → returns new VNode tree | Signal subscriber updates specific DOM node |
-| **Control Flow** | Map or ternary in JSX reruns component tree | Anchor range comments + reactive loop/try/async effect |
-| **Reconciliation** | Diff old VNode tree vs new VNode tree | Real DOM range branch/error/async switching |
+| **Control Flow** | Map or ternary in JSX reruns component tree | Standard JS (`ternary`, `.map()`) with fine-grained real DOM updates |
+| **Reconciliation** | Diff old VNode tree vs new VNode tree | Direct Real DOM updates without VNode diffing |
 | **DOM Touch** | Batch-patched after VNode diff | Micro-mutation on exact target `Text` / `Attribute` / `Range` |

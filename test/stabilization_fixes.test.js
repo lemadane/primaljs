@@ -5,7 +5,6 @@ import { signal } from "../src/signal.js";
 import { html } from "../src/html.js";
 import { mount } from "../src/mount.js";
 import { activate } from "../src/activate.js";
-import { Try, Catch, Await, Async, Pending } from "../src/control_flow.js";
 import { head } from "../src/seo.js";
 import { createRouter, RouteOutlet } from "../src/router.js";
 import { createApp } from "../src/app.js";
@@ -14,37 +13,6 @@ import { getCurrentContext } from "../src/lifecycle.js";
 import { register } from "../src/registry.js";
 
 describe("PrimalJS 0.1.0-alpha.1 Stabilization & Regression Fixes", () => {
-    it("1. Fixes double popContext() in <Try>, <Await>, and <Async>", () => {
-        let caughtError = null;
-
-        function FaultyComponent() {
-            throw new Error("Render Fault");
-        }
-        register(FaultyComponent);
-
-        function App() {
-            return html`
-                <Try>
-                    <FaultyComponent />
-                    <Catch>${err => { caughtError = err; return html`<p id="err">Handled</p>`; }}</Catch>
-                </Try>
-            `;
-        }
-
-        const appEl = document.getElementById("app");
-        const ctxBefore = getCurrentContext();
-
-        const app = mount(App, appEl);
-
-        const ctxAfter = getCurrentContext();
-        // Context stack MUST NOT be corrupted or over-popped!
-        assert.equal(ctxBefore, ctxAfter);
-        assert.ok(caughtError);
-        assert.equal(document.querySelector("#err").textContent, "Handled");
-
-        app.dispose();
-    });
-
     it("2. activate() preserves pre-rendered DOM without clearing innerHTML", () => {
         const appEl = document.getElementById("app");
         appEl.innerHTML = '<main id="ssr-root"><h1>Pre-rendered Content</h1><span data-primal-bind="msg">Old</span></main>';
@@ -64,42 +32,6 @@ describe("PrimalJS 0.1.0-alpha.1 Stabilization & Regression Fixes", () => {
         assert.equal(document.querySelector("span").textContent, "Activated Text");
 
         handle.dispose();
-    });
-
-    it("3 & 4. <Await> passes { signal } to promise factory and invalidates stale responses on unmount", async () => {
-        let passedSignal = null;
-        let resolveFn;
-
-        const slowPromise = new Promise(resolve => {
-            resolveFn = resolve;
-        });
-
-        function App() {
-            return html`
-                <Await promise=${({ signal }) => { passedSignal = signal; return slowPromise; }}>
-                    ${data => html`<p id="res">${data}</p>`}
-                    <Pending><p id="loading">Loading...</p></Pending>
-                </Await>
-            `;
-        }
-
-        const appEl = document.getElementById("app");
-        const app = mount(App, appEl);
-
-        assert.ok(passedSignal);
-        assert.equal(document.querySelector("#loading").textContent, "Loading...");
-
-        // Unmount app before promise resolves
-        app.dispose();
-
-        assert.equal(Boolean(passedSignal && passedSignal.aborted), true);
-
-        // Resolve promise after unmount
-        resolveFn("Late Data");
-        await new Promise(r => setTimeout(r, 10));
-
-        // DOM container remains empty and unmutated
-        assert.equal(appEl.innerHTML, "");
     });
 
     it("5. Restricts PWA cleanup to PrimalJS-owned workers and caches", async () => {

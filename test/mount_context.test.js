@@ -1,9 +1,9 @@
 import "./setup.js";
 import { describe, it } from "node:test";
 import assert from "node:assert/strict";
-import { html, signal, mount, onDestroy, onMount, register, Try, Catch, Mount } from "../src/index.js";
+import { html, signal, mount, onDestroy, onMount, register, Load } from "../src/index.js";
 
-describe("PrimalJS <Mount> Context Disposal & Parenting", () => {
+describe("PrimalJS <Load> Context Disposal & Parenting", () => {
     it("disposes previous component context and fires onDestroy when switching components", () => {
         let comp1Destroyed = false;
         let comp2Mounted = false;
@@ -22,12 +22,12 @@ describe("PrimalJS <Mount> Context Disposal & Parenting", () => {
             return html`<div class="comp2">Component 2</div>`;
         }
 
-        register(Comp1, Comp2, Mount);
+        register(Comp1, Comp2, Load);
 
         const activeComp = signal(Comp1);
 
         function App() {
-            return html`<Mount component=${activeComp} />`;
+            return html`<Load component=${activeComp} />`;
         }
 
         const handle = mount(App, "#app");
@@ -56,10 +56,10 @@ describe("PrimalJS <Mount> Context Disposal & Parenting", () => {
             return html`<div class="child">Child Content</div>`;
         }
 
-        register(ChildComp, Mount);
+        register(ChildComp, Load);
 
         function App() {
-            return html`<Mount component=${ChildComp} />`;
+            return html`<Load component=${ChildComp} />`;
         }
 
         const handle = mount(App, "#app");
@@ -72,47 +72,5 @@ describe("PrimalJS <Mount> Context Disposal & Parenting", () => {
 
         assert.equal(document.querySelector(".child"), null);
         assert.equal(compDestroyed, true);
-    });
-
-    it("inherits <Try> error boundary across reactive component switches", () => {
-        let errorCaught = null;
-
-        function NormalComp() {
-            return html`<div class="normal">Normal Component</div>`;
-        }
-
-        function FaultyComp() {
-            onMount(() => {
-                throw new Error("Switched Component Mount Error");
-            });
-            return html`<div class="faulty">Faulty Component</div>`;
-        }
-
-        register(NormalComp, FaultyComp, Mount, Try, Catch);
-
-        const activeComp = signal(NormalComp);
-
-        function App() {
-            return html`
-                <Try>
-                    <Mount component=${activeComp} />
-                    <Catch>${(err) => { errorCaught = err; return html`<div class="error">Error: ${err.message}</div>`; }}</Catch>
-                </Try>
-            `;
-        }
-
-        const handle = mount(App, "#app");
-
-        assert.equal(document.querySelector(".normal").textContent, "Normal Component");
-        assert.equal(errorCaught, null);
-
-        // Switch reactively to FaultyComp inside <Try>
-        activeComp.value = FaultyComp;
-
-        assert.ok(errorCaught);
-        assert.equal(errorCaught.message, "Switched Component Mount Error");
-        assert.equal(document.querySelector(".error").textContent, "Error: Switched Component Mount Error");
-
-        handle.dispose();
     });
 });

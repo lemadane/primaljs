@@ -321,12 +321,6 @@ function bindContent(targetNode, value, ctx) {
     const parent = targetNode.parentNode;
     if (!parent) return;
 
-    if (value && (value.__isContinue || value.__isBreak || value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isCatch || value.__isPending || value.__isBriefly || value.__isFailed)) {
-        const comment = document.createComment("primal:descriptor");
-        comment._primalDescriptor = value;
-        parent.replaceChild(comment, targetNode);
-        return;
-    }
 
     if (targetNode.nodeType === Node.TEXT_NODE && isSignal(value)) {
         const fullText = targetNode.nodeValue || "";
@@ -346,9 +340,6 @@ function bindContent(targetNode, value, ctx) {
 }
 
 function createValueNode(value, ctx) {
-    if (value && (value.__isElse || value.__isElseIf || value.__isCase || value.__isDefault || value.__isContinue || value.__isBreak || value.__isCatch || value.__isPending || value.__isBriefly || value.__isFailed)) {
-        return value;
-    }
     if (isSignal(value)) {
         const textNode = document.createTextNode(value.value ?? "");
         const disposer = effect(() => {
@@ -392,7 +383,6 @@ function createValueNode(value, ctx) {
                 }
                 activeCtx.templateValues = ctx.templateValues;
                 activeCtx.capitalTags = ctx.capitalTags;
-                if (ctx.tryBoundary) activeCtx.tryBoundary = ctx.tryBoundary;
             }
 
             pushContext(activeCtx);
@@ -481,17 +471,12 @@ function createValueNode(value, ctx) {
 function bindEvent(targetElement, attrName, handler, ctx) {
     if (typeof handler !== "function") return;
     const eventName = attrName.startsWith("on") ? attrName.slice(2).toLowerCase() : attrName.toLowerCase();
-    const tryBoundary = ctx ? ctx.tryBoundary : null;
 
     const wrappedHandler = (event) => {
         try {
             handler(event);
         } catch (err) {
-            if (tryBoundary && typeof tryBoundary.handleError === "function" && !tryBoundary.isDestroyed) {
-                tryBoundary.handleError(err);
-            } else {
-                reportGlobalError(err, { type: "event_handler", event: eventName, component: ctx ? ctx.name : null });
-            }
+            reportGlobalError(err, { type: "event_handler", event: eventName, component: ctx ? ctx.name : null });
         }
     };
 
@@ -649,9 +634,6 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
     }
     compCtx.templateValues = templateValues;
     compCtx.capitalTags = capitalTags;
-    if (parentCtx && parentCtx.tryBoundary) {
-        compCtx.tryBoundary = parentCtx.tryBoundary;
-    }
 
     pushContext(compCtx);
     let compResult;
@@ -680,15 +662,6 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
         compResult = componentFn(props);
     } finally {
         popContext();
-    }
-
-    if (compResult && (compResult.__isElse || compResult.__isElseIf || compResult.__isCase || compResult.__isDefault || compResult.__isContinue || compResult.__isBreak || compResult.__isCatch || compResult.__isPending || compResult.__isBriefly || compResult.__isFailed)) {
-        if (parent) {
-            const descriptorComment = document.createComment(`primal:${componentFn.name.toLowerCase()}`);
-            descriptorComment._primalDescriptor = compResult;
-            parent.replaceChild(descriptorComment, placeholderEl);
-        }
-        return;
     }
 
     const compDOM = convertToDOMNode(compResult, compCtx);

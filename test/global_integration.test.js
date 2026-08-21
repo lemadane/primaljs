@@ -11,12 +11,10 @@ import {
     clearRegistry,
     mount,
     activate,
-    Mount,
+    Load,
     createRouter,
     head,
-    createApp,
-    If,
-    For
+    createApp
 } from "../primal.js";
 
 function flushPromises() {
@@ -55,7 +53,7 @@ describe("PrimalJS Complete Framework Core & Integration Suite", () => {
         delete global.DocumentFragment;
     });
 
-    it("1. <Mount> dynamically switches components without rerunning parent component (executions === 1)", () => {
+    it("1. <Load> dynamically switches components without rerunning parent component (executions === 1)", () => {
         let executions = 0;
         let activePage;
 
@@ -69,7 +67,7 @@ describe("PrimalJS Complete Framework Core & Integration Suite", () => {
             return html`
                 <main>
                     <h1 id="title">PrimalJS App</h1>
-                    <Mount component=${activePage} />
+                    <Load component=${activePage} />
                 </main>
             `;
         }

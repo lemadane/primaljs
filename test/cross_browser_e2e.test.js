@@ -113,45 +113,9 @@ describe("PrimalJS Cross-Browser E2E Engine Suite (Chromium, Firefox, Safari/Web
                 await page.click("button[type='submit']");
                 assert.equal(await page.locator(".todo-item").count(), initialTodoCount + 1);
 
-                // 3. Declarative Conditional Example (<If>, <ElseIf>, <Else>) (examples/conditional)
-                await page.goto(`http://localhost:${port}/examples/conditional/index.html`, { waitUntil: "domcontentloaded" });
-                const loadingText = (await page.locator(".loading-msg").textContent()).trim();
-                assert.ok(loadingText.includes("Loading data from server"));
-                await page.click(".btn-ready");
-                const readyHeader = (await page.locator(".dashboard-header").textContent()).trim();
-                assert.ok(readyHeader.includes("Dashboard Ready"));
 
-                // 4. Declarative Switch Example (<Switch>, <Case>, <Default>) (examples/switch)
-                await page.goto(`http://localhost:${port}/examples/switch/index.html`, { waitUntil: "domcontentloaded" });
-                const switchLoading = (await page.locator(".loading-text").textContent()).trim();
-                assert.ok(switchLoading.includes("Loading data"));
-                await page.click(".btn-complete");
-                const switchComplete = (await page.locator(".complete-header").textContent()).trim();
-                assert.ok(switchComplete.includes("Task Complete"));
 
-                // 5. Declarative Keyed Loops Example (<For>, <Continue>, <Break>, <Else>) (examples/for)
-                await page.goto(`http://localhost:${port}/examples/for/index.html`, { waitUntil: "domcontentloaded" });
-                assert.equal(await page.locator(".user-card").count(), 2);
-                await page.click(".btn-toggle-stop");
-                assert.equal(await page.locator(".user-card").count(), 3);
-                await page.click(".btn-add");
-                assert.equal(await page.locator(".user-card").count(), 4);
-
-                // 6. Declarative Error Boundaries Example (<Try>, <Catch>) (examples/try_catch)
-                await page.goto(`http://localhost:${port}/examples/try_catch/index.html`, { waitUntil: "domcontentloaded" });
-                const statusMsg = (await page.locator(".status-msg").textContent()).trim();
-                assert.ok(statusMsg.includes("Dashboard is working smoothly"));
-                await page.click(".btn-cause-error");
-                const errText = (await page.locator(".err-text").textContent()).trim();
-                assert.ok(errText.includes("Dashboard rendering failed"));
-
-                // 7. Expressive Async Controls Example (<Delay>, <Wait>, <Briefly>, <Failed>) (examples/delay_wait)
-                await page.goto(`http://localhost:${port}/examples/delay_wait/index.html`, { waitUntil: "domcontentloaded" });
-                await page.waitForSelector(".user-info");
-                const userInfo = (await page.locator(".user-info").textContent()).trim();
-                assert.ok(userInfo.includes("User #1 (Lemuel)"));
-
-                // 8. Dynamic Component Switcher Example (<Mount>) (examples/render)
+                // 8. Dynamic Component Switcher Example (<Load>) (examples/render)
                 await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });
                 const profileHeader = (await page.locator(".profile-view h3").textContent()).trim();
                 assert.equal(profileHeader, "Profile Component");

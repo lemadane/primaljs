@@ -82,74 +82,9 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await context.close();
     });
 
-    it("runs declarative conditional app (examples/conditional) testing <If>, <ElseIf>, <Else>", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/conditional/index.html`, { waitUntil: "domcontentloaded" });
-        const loadingText = (await page.locator(".loading-msg").textContent()).trim();
-        assert.ok(loadingText.includes("Loading data from server"));
-        await page.click(".btn-ready");
-        const readyHeader = (await page.locator(".dashboard-header").textContent()).trim();
-        assert.ok(readyHeader.includes("Dashboard Ready"));
-        await context.close();
-    });
 
-    it("runs declarative switch app (examples/switch) testing <Switch>, <Case>, <Default>", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/switch/index.html`, { waitUntil: "domcontentloaded" });
-        const switchLoading = (await page.locator(".loading-text").textContent()).trim();
-        assert.ok(switchLoading.includes("Loading data"));
-        await page.click(".btn-complete");
-        const switchComplete = (await page.locator(".complete-header").textContent()).trim();
-        assert.ok(switchComplete.includes("Task Complete"));
-        await context.close();
-    });
 
-    it("runs declarative loop app (examples/for) testing <For>, <Continue>, <Break>, <Else>", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/for/index.html`, { waitUntil: "domcontentloaded" });
-        assert.equal(await page.locator(".user-card").count(), 2);
-        await page.click(".btn-toggle-stop");
-        assert.equal(await page.locator(".user-card").count(), 3);
-        await page.click(".btn-add");
-        assert.equal(await page.locator(".user-card").count(), 4);
-        await context.close();
-    });
-
-    it("runs declarative try/catch app (examples/try_catch) testing <Try>, <Catch>", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/try_catch/index.html`, { waitUntil: "domcontentloaded" });
-        const statusMsg = (await page.locator(".status-msg").textContent()).trim();
-        assert.ok(statusMsg.includes("Dashboard is working smoothly"));
-        await page.click(".btn-cause-error");
-        const errText = (await page.locator(".err-text").textContent()).trim();
-        assert.ok(errText.includes("Dashboard rendering failed"));
-        await context.close();
-    });
-
-    it("runs declarative async/await app (examples/async_await) awaiting promises & pending/catch states", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/async_await/index.html`, { waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".status-box p");
-        assert.ok((await page.locator(".status-box p").first().textContent()).length > 0);
-        await context.close();
-    });
-
-    it("runs expressive delay & wait app (examples/delay_wait) testing <Delay>, <Wait>, <Briefly>, <Failed>", async () => {
-        const context = await browser.newContext();
-        const page = await context.newPage();
-        await page.goto(`http://localhost:${port}/examples/delay_wait/index.html`, { waitUntil: "domcontentloaded" });
-        await page.waitForSelector(".user-info");
-        const userInfo = (await page.locator(".user-info").textContent()).trim();
-        assert.ok(userInfo.includes("User #1 (Lemuel)"));
-        await context.close();
-    });
-
-    it("runs dynamic render app (examples/render) testing <Mount> component switching", async () => {
+    it("runs dynamic render app (examples/render) testing <Load> component switching", async () => {
         const context = await browser.newContext();
         const page = await context.newPage();
         await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });

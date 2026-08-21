@@ -1,31 +1,18 @@
+// @ts-nocheck
 import {
     html,
     signal,
     computed,
-    batch,
     ref,
     register,
     createApp,
     createRouter,
     RouteOutlet,
     head,
-    If,
-    For,
-    Continue,
-    Break,
-    Else,
-    Switch,
-    Case,
-    Default,
-    Try,
-    Catch,
-    Await,
-    Pending,
-    Mount
+    onMount
 } from "../../primal.js";
 
 // --- Global Reactive State ---
-const userCount = signal(3);
 const searchQuery = signal("");
 const activeTab = signal("all");
 
@@ -64,7 +51,7 @@ function HeaderNav() {
                 <nav>
                     <ul>
                         <li><a href="/">Dashboard</a></li>
-                        <li><a href="/users">Users List (<For each=${() => [filteredUsers.value.length]}>${len => html`${len}`}</For>)</a></li>
+                        <li><a href="/users">Users List (${() => filteredUsers.value.length})</a></li>
                         <li><a href="/async">Async Loader</a></li>
                     </ul>
                 </nav>
@@ -131,7 +118,7 @@ function UsersPage() {
 
     return html`
         <div>
-            <h2>Declarative Keyed Loop (<For>) & Search</h2>
+            <h2>User Search & List</h2>
             <div class="card" style="margin-top: 1rem;">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
                     <input class="input-field" placeholder="Search users by name or role..." oninput=${(e) => searchQuery.value = e.target.value} style="margin-top:0;" />
@@ -140,20 +127,15 @@ function UsersPage() {
                 </div>
 
                 <div class="user-list">
-                    <For each=${filteredUsers} key=${u => u.id}>
-                        ${u => html`
-                            <div class="user-row">
-                                <div>
-                                    <strong>${u.name}</strong>
-                                    <div style="font-size: 0.85rem; color: var(--text-muted);">${u.role}</div>
-                                </div>
-                                <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-warning'}">${u.status}</span>
+                    ${() => filteredUsers.value.length > 0 ? filteredUsers.value.map(u => html`
+                        <div class="user-row">
+                            <div>
+                                <strong>${u.name}</strong>
+                                <div style="font-size: 0.85rem; color: var(--text-muted);">${u.role}</div>
                             </div>
-                        `}
-                        <Else>
-                            <div style="padding: 1.5rem; text-align: center; color: var(--text-muted);">No users found.</div>
-                        </Else>
-                    </For>
+                            <span class="badge ${u.status === 'active' ? 'badge-success' : 'badge-warning'}">${u.status}</span>
+                        </div>
+                    `) : html`<div style="padding: 1.5rem; text-align: center; color: var(--text-muted);">No users found.</div>`}
                 </div>
             </div>
         </div>
@@ -163,49 +145,36 @@ function UsersPage() {
 function AsyncPage() {
     head({ title: "Async Loader | PrimalJS Showcase" });
 
-    const fetchFakeData = ({ signal }) => {
-        return new Promise((resolve, reject) => {
-            const timeout = setTimeout(() => {
-                resolve({ title: "PrimalJS Async Capability", status: "Success", timestamp: new Date().toLocaleTimeString() });
-            }, 1200);
+    const dataSignal = signal(null);
+    const loadingSignal = signal(true);
 
-            if (signal) {
-                signal.addEventListener("abort", () => clearTimeout(timeout));
-            }
-        });
-    };
+    onMount(() => {
+        setTimeout(() => {
+            dataSignal.value = { title: "PrimalJS Async Capability", timestamp: new Date().toLocaleTimeString() };
+            loadingSignal.value = false;
+        }, 300);
+    });
 
     return html`
         <div>
-            <h2>Declarative Async Handling (<Await>)</h2>
+            <h2>Async State Loading</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                Suspense-like Promise resolving without parent component re-renders.
+                Async data loading with Signals without parent component re-renders.
             </p>
 
             <div class="card">
-                <Await promise=${fetchFakeData}>
-                    ${data => html`
-                        <div style="color: var(--accent-emerald);">
-                            <h3>✓ Data Resolved Successfully</h3>
-                            <p><strong>Title:</strong> ${data.title}</p>
-                            <p><strong>Time:</strong> ${data.timestamp}</p>
-                        </div>
-                    `}
-                    <Pending>
-                        <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-secondary);">
-                            <div class="loading-spinner"></div>
-                            <span>Fetching mock async data from server...</span>
-                        </div>
-                    </Pending>
-                    <Catch>
-                        ${(err, retry) => html`
-                            <div style="color: var(--accent-pink);">
-                                <p>Failed to load data: ${err.message}</p>
-                                <button class="btn" onclick=${retry}>Retry Request</button>
-                            </div>
-                        `}
-                    </Catch>
-                </Await>
+                ${() => loadingSignal.value ? html`
+                    <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-secondary);">
+                        <div class="loading-spinner"></div>
+                        <span>Fetching mock async data from server...</span>
+                    </div>
+                ` : html`
+                    <div style="color: var(--accent-emerald);">
+                        <h3>✓ Data Resolved Successfully</h3>
+                        <p><strong>Title:</strong> ${dataSignal.value?.title}</p>
+                        <p><strong>Time:</strong> ${dataSignal.value?.timestamp}</p>
+                    </div>
+                `}
             </div>
         </div>
     `;

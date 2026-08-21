@@ -2,8 +2,7 @@
  * PrimalJS Component Registry
  */
 
-import { If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending } from "./control_flow.js";
-import { Mount } from "./mount.js";
+import { Load } from "./mount.js";
 
 
 const registry = new Map();
@@ -39,7 +38,7 @@ export function getComponent(name) {
 }
 
 /**
- * Clears custom components from the registry while preserving default control flow components.
+ * Clears custom components from the registry while preserving default framework components.
  */
 export function clearRegistry() {
     const savedRouteOutlet = registry.get("RouteOutlet");
@@ -52,7 +51,7 @@ export function clearRegistry() {
 
 
 function registerDefaultComponents() {
-    register(If, ElseIf, Else, Switch, Case, Default, For, Continue, Break, Try, Catch, Delay, Wait, Briefly, Failed, Async, Await, Pending, Mount);
+    register(Load);
 }
 
 registerDefaultComponents();
