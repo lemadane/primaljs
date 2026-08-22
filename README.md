@@ -2,7 +2,7 @@
 
 > **The Super Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Typescript, No Babel, No JSX, No Compiler, No Virtual DOM, No Re-Render.**
 
-PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and component framework currently in beta (`v0.4.0-beta`). Built directly on modern browser APIs, PrimalJS brings web development back to its fundamentals — **JavaScript stays JavaScript**.
+PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and component framework currently in beta (`v0.4.1-beta`). Built directly on modern browser APIs, PrimalJS brings web development back to its fundamentals — **JavaScript stays JavaScript**.
 
 ---
 
@@ -19,6 +19,7 @@ PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and com
 - [Quick Start & Installation](#quick-start--installation)
   - [Option A: NPM Package](#option-a-npm-package)
   - [Option B: Zero-Build Standalone ES Module](#option-b-zero-build-standalone-es-module)
+- [Standalone & Minified Bundles](#standalone--minified-bundles)
 - [Mounting & DOM Hydration](#mounting--dom-hydration)
   - [`mount()` — Create & Mount New DOM](#mount--create--mount-new-dom)
   - [`hydrate()` — Activate & Adopt Existing Static DOM](#hydrate--activate--adopt-existing-static-dom)
@@ -86,7 +87,7 @@ mount(Counter, "#app");
 
 ### Option B: Zero-Build Standalone ES Module
 
-Copy `dist/primal.standalone.js` into your project and import directly in `index.html`:
+Copy `dist/primal.min.js` (or `dist/primal.standalone.js`) into your project and import directly in `index.html`:
 
 ```html
 <!DOCTYPE html>
@@ -99,7 +100,7 @@ Copy `dist/primal.standalone.js` into your project and import directly in `index
     <div id="app"></div>
 
     <script type="module">
-        import { html, signal, mount } from "./js/primal.standalone.js";
+        import { html, signal, mount } from "./js/primal.min.js";
 
         function App() {
             const name = signal("World");
@@ -111,6 +112,51 @@ Copy `dist/primal.standalone.js` into your project and import directly in `index
 </body>
 </html>
 ```
+
+---
+
+## Standalone & Minified Bundles
+
+PrimalJS produces two zero-dependency browser ES module distribution formats generated side-by-side during `npm run build`:
+
+| File | Purpose | Size | Best Used For |
+| :--- | :--- | :--- | :--- |
+| **`dist/primal.standalone.js`** <br>*(or `./primal.js`)* | **Unminified** | ~180 KB | **Development & Debugging** — Readable source code with module section headers intact for line-by-line inspection in DevTools. |
+| **`dist/primal.min.js`** <br>*(or `./primal.min.js`)* | **Minified** | ~143 KB | **Production Deployment** — Compressed whitespace and stripped comments for minimal network payload size. |
+
+Both files exist independently in `dist/` (and mirrored as `./primal.js` and `./primal.min.js` at the root directory), so you can pick whichever fits your workflow.
+
+### Minification & Bundle Features
+
+1. **Zero-Dependency Automated Build Pipeline**:
+   - Bundles are constructed natively via [scripts/build-standalone.js](file:///home/lem/Projects/js/primaljs/scripts/build-standalone.js) using Node.js standard APIs.
+   - Requires zero external bundlers or minifier npm dependencies (no Babel, Terser, or esbuild required).
+
+2. **JSDoc & IDE IntelliSense Preservation**:
+   - The custom minification pass preserves all JSDoc annotations (`/** ... */`) intact.
+   - Editors like VS Code retain full hover tooltips, type parameters, and parameter documentation even when importing the minified module (`primal.min.js`).
+
+3. **Flexible Import Options**:
+   - **NPM Package Import**:
+     ```javascript
+     // Standard ES import
+     import { signal, html, mount } from "primaljs";
+
+     // Production minified ES module import
+     import { signal, html, mount } from "primaljs/min";
+     ```
+   - **Zero-Build Static HTML Import**:
+     ```html
+     <!-- Production: Minified Bundle -->
+     <script type="module">
+       import { signal, html, mount } from "./primal.min.js";
+     </script>
+
+     <!-- Development: Unminified Bundle -->
+     <script type="module">
+       import { signal, html, mount } from "./primal.standalone.js";
+     </script>
+     ```
 
 ---
 

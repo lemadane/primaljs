@@ -1,18 +1,21 @@
 {
   "name": "primaljs",
-  "version": "0.4.0-beta",
+  "version": "0.4.1-beta",
   "description": "Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real DOM Updates, No Virtual DOM, No Compiler.",
   "type": "module",
   "main": "src/index.js",
   "exports": {
     ".": "./src/index.js",
     "./primal.js": "./primal.js",
-    "./standalone": "./dist/primal.standalone.js"
+    "./primal.min.js": "./primal.min.js",
+    "./standalone": "./dist/primal.standalone.js",
+    "./min": "./dist/primal.min.js"
   },
   "files": [
     "src",
     "dist",
-    "primal.js"
+    "primal.js",
+    "primal.min.js"
   ],
   "repository": {
     "type": "git",

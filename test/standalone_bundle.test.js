@@ -36,4 +36,30 @@ describe("PrimalJS Standalone ES Module Bundle (Zero Build) Suite", () => {
 
         handle.dispose();
     });
+
+    it("imports dist/primal.min.js as a zero-dependency minified ES module and mounts app", async () => {
+        const PrimalMin = await import("../dist/primal.min.js");
+
+        assert.ok(PrimalMin.signal, "Exports signal()");
+        assert.ok(PrimalMin.html, "Exports html()");
+        assert.ok(PrimalMin.mount, "Exports mount()");
+        assert.ok(PrimalMin.createApp, "Exports createApp()");
+
+        const count = PrimalMin.signal(42);
+
+        function MinApp() {
+            return PrimalMin.html`<div id="min-app">Minified Val: ${count}</div>`;
+        }
+
+        const handle = PrimalMin.mount(MinApp, container);
+
+        const el = container.querySelector("#min-app");
+        assert.ok(el, "Mounts element from minified module");
+        assert.equal(el.textContent, "Minified Val: 42");
+
+        count.value = 100;
+        assert.equal(el.textContent, "Minified Val: 100");
+
+        handle.dispose();
+    });
 });

@@ -16,7 +16,7 @@ import { ref } from "../src/ref.js";
 import { scrollLock, _resetScrollLockStateForTest } from "../src/scroll-lock.js";
 import { ComponentContext, pushContext, popContext, deactivateContext } from "../src/lifecycle.js";
 
-describe("PrimalJS 0.4.0-beta Stabilization & Bug Fix Regression Suite", () => {
+describe("PrimalJS 0.4.1-beta Stabilization & Bug Fix Regression Suite", () => {
     it("1. <Delay> stale-Promise resolution does not cancel superseded task's timeout", async () => {
         const appEl = document.getElementById("app");
         appEl.innerHTML = "";
