@@ -2,7 +2,7 @@
 
 > **The Super Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Typescript, No Babel, No JSX, No Compiler, No Virtual DOM, No Re-Render. Turns out you don't need those BS complications.**
 
-PrimalJS is a lightweight Single Page Application (SPA) framework currently in beta, designed for production-oriented applications built directly on modern browser APIs. Back to the fundamentals of web development — **JavaScript stays JavaScript**.
+PrimalJS is a lightweight Single Page Application (SPA) framework currently in beta (`v0.4.0-beta`), designed for production-oriented applications built directly on modern browser APIs. Back to the fundamentals of web development — **JavaScript stays JavaScript**.
 
 ---
 
@@ -26,7 +26,12 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
   - [`batch()` — Atomic Multi-Field Updates](#batch--atomic-multi-field-updates)
   - [`untrack()` — Silent Signal Reads](#untrack--silent-signal-reads)
   - [`ref()` — Direct DOM References](#ref--direct-dom-references)
-- [`<Load>` — Dynamic Component Switcher](#load--dynamic-component-switcher)
+- [Reactive Control Flow & Keyed List Reconciliation](#reactive-control-flow--keyed-list-reconciliation)
+- [Declarative Lifecycle Components](#declarative-lifecycle-components)
+  - [`<Load>` — Dynamic Component Switcher](#load--dynamic-component-switcher)
+  - [`<Wait>` — Promise Observation & Unwrap](#wait--promise-observation--unwrap)
+  - [`<Delay>` — Reactive Async Task Lifecycle](#delay--reactive-async-task-lifecycle)
+  - [`<Boundary>` — Localized Error Boundary](#boundary--localized-error-boundary)
 - [Client-Side SPA Router & Layouts](#client-side-spa-router--layouts)
 - [SEO & Pre-rendered DOM Activation](#seo--pre-rendered-dom-activation)
   - [`head()` — Dynamic Head Metadata](#head--dynamic-head-metadata)
@@ -145,7 +150,7 @@ Run directly in any web browser without Node.js, npm, or build tools:
 
 ## Reactive Control Flow & Keyed List Reconciliation
 
-Because PrimalJS guarantees single component execution (`executions === 1`), standard JavaScript `if` and `Array.prototype.map` evaluated outside arrow functions run **once on component mount**. To make control flow and list rendering reactive, wrap them inside function expressions:
+Because PrimalJS guarantees single component execution (`executions === 1`), standard JavaScript `if`, `switch`, and `Array.prototype.map` evaluated outside arrow functions run **once on component mount**. To make control flow and list rendering reactive, wrap them inside function expressions:
 
 | Control Flow Pattern | Static (Runs Once on Mount) | Reactive (Updates on Signal Change) |
 |---|---|---|
@@ -157,9 +162,99 @@ Dynamic lists returned from reactive functions `${() => list.value.map(...)}` pe
 
 ---
 
-## Local Error Handling with `<Boundary>`
+## Declarative Lifecycle Components
 
-The `<Boundary>` component catches unhandled errors within its child component subtree, preventing whole-app crashes and rendering localized fallback UI:
+PrimalJS control flow remains pure JavaScript (`if`, `switch`, `.map()`, `ternary`). Specialized framework components are provided exclusively to manage **reactive subtrees and asynchronous lifecycles**:
+
+| Component | Responsibility |
+|---|---|
+| **`<Load>`** | Dynamic Component Switcher ("Which component should exist?") |
+| **`<Wait>`** | Promise Observation & Unwrap ("When is an existing Promise available?") |
+| **`<Delay>`** | Reactive Async Task Lifecycle ("Execute and manage a reactive async operation") |
+| **`<Boundary>`** | UI Error Boundary ("What happens when a subtree fails?") |
+
+---
+
+### `<Wait>` — Promise Observation & Unwrap
+
+Observes an existing Promise (or Promise-returning function/Signal) and unwraps its resolved value while rendering `<Briefly>` loading fallback UI:
+
+```javascript
+import { html, Wait, Briefly, Failed } from "primaljs";
+
+const userPromise = fetch("/api/user/123").then(res => res.json());
+
+function UserProfile() {
+    return html`
+        <Wait for=${userPromise}>
+            ${user => html`
+                <div class="user-card">
+                    <h2>${user.name}</h2>
+                    <p>Role: ${user.role}</p>
+                </div>
+            `}
+
+            <Briefly>
+                <div class="spinner">Loading profile...</div>
+            </Briefly>
+
+            <Failed>
+                ${(err, retry) => html`
+                    <div class="error">
+                        <p>Failed: ${err.message}</p>
+                        <button onclick=${retry}>Retry</button>
+                    </div>
+                `}
+            </Failed>
+        </Wait>
+    `;
+}
+```
+
+---
+
+### `<Delay>` — Reactive Async Task Lifecycle
+
+Owns and manages a reactive asynchronous operation. Automatically passes an `AbortController` signal to the task and aborts pending in-flight requests when Signal dependencies update or when the component unmounts:
+
+```javascript
+import { html, signal, Delay, Briefly, Failed } from "primaljs";
+
+const userId = signal(1);
+
+function UserSearch() {
+    return html`
+        <div>
+            <button onclick=${() => userId.value++}>Next User (${userId})</button>
+
+            <Delay task=${({ signal }) => fetch(`/api/users/${userId.value}`, { signal }).then(r => r.json())}>
+                ${user => html`
+                    <div class="card">
+                        <h3>${user.name}</h3>
+                    </div>
+                `}
+
+                <Briefly>
+                    <p>Fetching user ${userId}...</p>
+                </Briefly>
+
+                <Failed>
+                    ${(err, retry) => html`
+                        <p>Error: ${err.message}</p>
+                        <button onclick=${retry}>Try Again</button>
+                    `}
+                </Failed>
+            </Delay>
+        </div>
+    `;
+}
+```
+
+---
+
+### `<Boundary>` — Localized Error Boundary
+
+Catches unhandled exceptions or rejected promises in its child component subtree, preventing application crashes:
 
 ```javascript
 import { html, Boundary } from "primaljs";
@@ -178,6 +273,25 @@ function App() {
 }
 ```
 
+#### Error Propagation Hierarchy
+```text
+Promise / Task Rejection
+         │
+         ▼
+     rejected?
+         │
+         ▼
+  <Failed> slot exists? ── yes ──> Render <Failed> slot locally
+         │
+         no
+         ▼
+  <Boundary> exists? ─── yes ──> Render <Boundary> fallback
+         │
+         no
+         ▼
+  createApp({ onError }) / reportGlobalError()
+```
+
 ---
 
 ## Architecture & Verification
@@ -192,14 +306,14 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 ### Running Tests
 
 ```bash
-# Run unit & integration test suite (87/87 passing)
+# Run complete unit & async test suite (101/101 passing)
 npm run test:unit
+
+# Run full E2E Playwright browser suite (Hello, Todo, Render, Showcase SPA)
+npm run test:e2e
 
 # Run cross-browser suite targeting Chromium, Firefox, WebKit, Edge, and mobile Chromium
 npm run test:e2e:cross
-
-# Run full test suite
-npm run test:e2e
 ```
 
 ### Accurate Browser Verification Matrix
@@ -209,23 +323,12 @@ npm run test:e2e
 - **WebKit / Safari Engine**: Tested & Passed
 - **Mobile Chromium Emulation**: Tested & Passed
 - **Actual Microsoft Edge**: Not guaranteed by current local runner (requires system installation)
-- **Actual Samsung Internet**: Not tested
 
 ```text
-=== MATRIX REPEATED PASS 1 ===
-ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
-ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
-ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
-
-=== MATRIX REPEATED PASS 2 ===
-ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
-ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
-ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
-
-=== MATRIX REPEATED PASS 3 ===
-ℹ tests 87 unit | pass 87 | fail 0 | 0 errors
-ℹ tests 3 e2e  | pass 3  | fail 0 | 0 errors
-ℹ tests 5 cross| pass 3  | fail 0 | 2 skipped (uninstalled local binaries)
+=== MATRIX VERIFICATION RESULTS ===
+ℹ tests 101 unit | pass 101 | fail 0 | 0 errors
+ℹ tests 4 e2e   | pass 4   | fail 0 | 0 errors
+ℹ tests 5 cross | pass 3   | fail 0 | 2 skipped (uninstalled local binaries)
 ```
 
 ---
