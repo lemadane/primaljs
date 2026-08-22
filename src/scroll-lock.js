@@ -31,7 +31,9 @@ function calculateScrollbarWidth() {
 
 function resolveTargetElement(target) {
     const doc = _getDocScrollLock();
-    if (!target) return doc ? doc.body : null;
+    if (target === undefined) {
+        return doc ? doc.body : null;
+    }
 
     let el = target;
     if (typeof target === "object" && target !== null && "current" in target) {
@@ -43,7 +45,7 @@ function resolveTargetElement(target) {
     if (typeof Element !== "undefined" && el instanceof Element) {
         return el;
     }
-    return doc ? doc.body : null;
+    return null;
 }
 
 function applyScrollLockToElement(el) {
@@ -103,22 +105,23 @@ function releaseScrollLockFromElement(el) {
 export function scrollLock(target) {
     let ownsLock = true;
     let lockCurrentlyAcquired = false;
+    let acquiredElement = null;
 
     function acquire() {
         if (!ownsLock || lockCurrentlyAcquired) return;
         const el = resolveTargetElement(target);
         if (!el) return;
+        acquiredElement = el;
         lockCurrentlyAcquired = true;
         applyScrollLockToElement(el);
     }
 
     function release() {
-        if (!lockCurrentlyAcquired) return;
-        const el = resolveTargetElement(target);
+        if (!lockCurrentlyAcquired || !acquiredElement) return;
+        const el = acquiredElement;
+        acquiredElement = null;
         lockCurrentlyAcquired = false;
-        if (el) {
-            releaseScrollLockFromElement(el);
-        }
+        releaseScrollLockFromElement(el);
     }
 
     function unlock() {
@@ -130,6 +133,15 @@ export function scrollLock(target) {
 
     const ctx = getCurrentContext();
     if (ctx) {
+        const isRefTarget = typeof target === "object" && target !== null && "current" in target;
+        if (isRefTarget) {
+            ctx.addMountHook(() => {
+                if (ownsLock && !lockCurrentlyAcquired) {
+                    acquire();
+                }
+            });
+        }
+
         ctx.addDestroyHook(() => {
             unlock();
         });

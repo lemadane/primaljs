@@ -493,14 +493,20 @@ export class Router {
 
         if (this.mode === "hash") {
             let targetHash = to.startsWith("#") ? to : "#" + (to.startsWith("/") ? to : "/" + to);
+            const currentHash = window.location.hash || "#/";
+
+            if (currentHash === targetHash) {
+                const { path, search, hash } = this.getHashRoute();
+                this.resolveRoute(path, search, hash);
+                return;
+            }
+
             if (options.replace) {
                 const base = window.location.pathname + window.location.search;
                 window.location.replace(base + targetHash);
             } else {
                 window.location.hash = targetHash;
             }
-            const { path, search, hash } = this.getHashRoute();
-            this.resolveRoute(path, search, hash);
         } else {
             const targetUrl = new URL(to, window.location.origin);
             const nextPath = targetUrl.pathname;

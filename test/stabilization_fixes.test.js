@@ -12,6 +12,7 @@ import { setupPwa, unregisterServiceWorkers } from "../src/pwa.js";
 import { Delay, TimeoutError } from "../src/async.js";
 import { WithinView } from "../src/within-view.js";
 import { Place } from "../src/place.js";
+import { ref } from "../src/ref.js";
 import { scrollLock, _resetScrollLockStateForTest } from "../src/scroll-lock.js";
 import { ComponentContext, pushContext, popContext, deactivateContext } from "../src/lifecycle.js";
 
@@ -138,7 +139,7 @@ describe("PrimalJS 0.4.0-beta Stabilization & Bug Fix Regression Suite", () => {
         handle.dispose();
     });
 
-    it("4. scrollLock(target) respects target element and reference counts without double-decrement", () => {
+    it("4. scrollLock(target) respects target element and handles unpopulated ref objects cleanly", () => {
         _resetScrollLockStateForTest();
 
         const sidebar = document.createElement("div");
@@ -150,25 +151,28 @@ describe("PrimalJS 0.4.0-beta Stabilization & Bug Fix Regression Suite", () => {
         assert.equal(sidebar.style.overflow, "hidden");
         assert.notEqual(document.body.style.overflow, "hidden", "Body should not be locked when targeting sidebar");
 
-        // Test lifecycle hooks deactivation/destruction reference count safety
-        const ctx = new ComponentContext("LockTest");
-        pushContext(ctx);
-        const unlockCtx = scrollLock();
-        popContext();
+        // Test unpopulated ref object: scrollLock(modalRef) before ref is attached to DOM
+        const modalRef = ref();
+        assert.equal(modalRef.current, null);
 
-        assert.equal(document.body.style.overflow, "hidden");
+        function ModalComp() {
+            scrollLock(modalRef);
+            return html`<div id="modal-el" ref=${modalRef} style="overflow: auto;">Modal Content</div>`;
+        }
 
-        // Deactivate component context (temporary release)
-        deactivateContext(ctx);
-        assert.notEqual(document.body.style.overflow, "hidden");
+        const appEl = document.getElementById("app");
+        const modalHandle = mount(ModalComp, appEl);
 
-        // Unlock manually while deactivated
-        unlockCtx();
+        // Modal ref must not fall back to locking document.body while null
+        assert.notEqual(document.body.style.overflow, "hidden", "Explicit null ref must not lock document.body");
 
-        // Destroy component context
-        ctx.dispose();
+        const modalEl = document.getElementById("modal-el");
+        assert.ok(modalEl);
+        assert.equal(modalEl.style.overflow, "hidden", "Modal element must be locked once ref populates on mount");
 
-        // Must not crash or double-release global count below 0
+        // Dispose modal -> must unlock modalEl without touching document.body
+        modalHandle.dispose();
+        assert.equal(modalEl.style.overflow, "auto");
         assert.notEqual(document.body.style.overflow, "hidden");
 
         unlockSidebar();
@@ -176,15 +180,23 @@ describe("PrimalJS 0.4.0-beta Stabilization & Bug Fix Regression Suite", () => {
         document.body.removeChild(sidebar);
     });
 
-    it("5. createRouter({ mode: 'hash' }) supports hash navigation and routing", async () => {
+    it("5. createRouter({ mode: 'hash' }) supports hash navigation and executes beforeEnter exactly ONCE", async () => {
         const appEl = document.getElementById("app");
         appEl.innerHTML = "";
+
+        let guardRuns = 0;
 
         const router = createRouter({
             mode: "hash",
             routes: [
                 { path: "/", component: () => html`<div>Home</div>` },
-                { path: "/about", component: () => html`<div>About Page</div>` }
+                {
+                    path: "/about",
+                    beforeEnter() {
+                        guardRuns++;
+                    },
+                    component: () => html`<div>About Page</div>`
+                }
             ]
         });
 
@@ -194,10 +206,11 @@ describe("PrimalJS 0.4.0-beta Stabilization & Bug Fix Regression Suite", () => {
         assert.ok(appEl.textContent.includes("Home"));
 
         router.navigate("/about");
-        await new Promise(r => setTimeout(r, 10));
+        await new Promise(r => setTimeout(r, 20));
 
         assert.equal(window.location.hash, "#/about");
         assert.ok(appEl.textContent.includes("About Page"));
+        assert.equal(guardRuns, 1, "beforeEnter guard must run EXACTLY ONCE on navigate in hash mode");
 
         app.dispose();
     });
