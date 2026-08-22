@@ -28,15 +28,15 @@ PrimalJS is a lightweight Single Page Application (SPA) framework currently in b
   - [`ref()` — Direct DOM References](#ref--direct-dom-references)
 - [Reactive Control Flow & Keyed List Reconciliation](#reactive-control-flow--keyed-list-reconciliation)
 - [Declarative Lifecycle Components](#declarative-lifecycle-components)
+  - [`<Boundary>` — Localized Error Boundary](#boundary--localized-error-boundary)
+  - [`<Delay>` — Reactive Async Task Lifecycle](#delay--reactive-async-task-lifecycle)
   - [`<Load>` — Dynamic Component Switcher](#load--dynamic-component-switcher)
   - [`<Wait>` — Promise Observation & Unwrap](#wait--promise-observation--unwrap)
-  - [`<Delay>` — Reactive Async Task Lifecycle](#delay--reactive-async-task-lifecycle)
-  - [`<Boundary>` — Localized Error Boundary](#boundary--localized-error-boundary)
 - [Client-Side SPA Router & Layouts](#client-side-spa-router--layouts)
 - [SEO & Pre-rendered DOM Activation](#seo--pre-rendered-dom-activation)
   - [`head()` — Dynamic Head Metadata](#head--dynamic-head-metadata)
   - [`activate()` — Zero-Flash Hydration](#activate--zero-flash-hydration)
-- [Zero-Dependency PWA Management](#zero-dependency-pwa-management)
+- [Zero-Dependency PWA Management](#zero-dependency-pWA-management)
 - [Architecture & Verification](#architecture--verification)
 - [Credits & Attribution](#credits--attribution)
 - [License](#license)
@@ -154,7 +154,7 @@ Because PrimalJS guarantees single component execution (`executions === 1`), sta
 
 | Control Flow Pattern | Static (Runs Once on Mount) | Reactive (Updates on Signal Change) |
 |---|---|---|
-| **Conditional Rendering** | `if (status.value) ...` | `${() => status.value ? html\`<p>Active</p>\` : html\`<p>Inactive</p>\`}` |
+| **Conditional Rendering** | `if (status.value) ...` | `${() => status.value ? html\`<p>Active</p\` : html\`<p>Inactive</p\`}` |
 | **List Rendering** | `items.map(item => ...)` | `${() => items.value.map(item => html\`<li key=\${item.id}>\${item.name}</li>\`)}` |
 
 ### Keyed List DOM Reconciliation & State Preservation
@@ -162,57 +162,64 @@ Dynamic lists returned from reactive functions `${() => list.value.map(...)}` pe
 
 ---
 
+<a id="declarative-lifecycle-components"></a>
 ## Declarative Lifecycle Components
 
 PrimalJS control flow remains pure JavaScript (`if`, `switch`, `.map()`, `ternary`). Specialized framework components are provided exclusively to manage **reactive subtrees and asynchronous lifecycles**:
 
 | Component | Responsibility |
 |---|---|
+| **`<Boundary>`** | UI Error Boundary ("What happens when a subtree fails?") |
+| **`<Delay>`** | Reactive Async Task Lifecycle ("Execute and manage a reactive async operation") |
 | **`<Load>`** | Dynamic Component Switcher ("Which component should exist?") |
 | **`<Wait>`** | Promise Observation & Unwrap ("When is an existing Promise available?") |
-| **`<Delay>`** | Reactive Async Task Lifecycle ("Execute and manage a reactive async operation") |
-| **`<Boundary>`** | UI Error Boundary ("What happens when a subtree fails?") |
 
 ---
 
-### `<Wait>` — Promise Observation & Unwrap
+<a id="boundary--localized-error-boundary"></a>
+### `<Boundary>` — Localized Error Boundary
 
-Observes an existing Promise (or Promise-returning function/Signal) and unwraps its resolved value while rendering `<Briefly>` loading fallback UI:
+Catches unhandled exceptions or rejected promises in its child component subtree, preventing application crashes:
 
 ```javascript
-import { html, Wait, Briefly, Failed } from "primaljs";
+import { html, Boundary } from "primaljs";
 
-const userPromise = fetch("/api/user/123").then(res => res.json());
-
-function UserProfile() {
+function App() {
     return html`
-        <Wait for=${userPromise}>
-            ${user => html`
-                <div class="user-card">
-                    <h2>${user.name}</h2>
-                    <p>Role: ${user.role}</p>
-                </div>
-            `}
-
-            <Briefly>
-                <div class="spinner">Loading profile...</div>
-            </Briefly>
-
-            <Failed>
-                ${(err, retry) => html`
-                    <div class="error">
-                        <p>Failed: ${err.message}</p>
-                        <button onclick=${retry}>Retry</button>
-                    </div>
-                `}
-            </Failed>
-        </Wait>
+        <Boundary fallback=${(err, retry) => html`
+            <div class="error-card">
+                <p>Failed to load component: ${err.message}</p>
+                <button onclick=${retry}>Try Again</button>
+            </div>
+        `}>
+            <WidgetComponent />
+        </Boundary>
     `;
 }
 ```
 
+#### Error Propagation Hierarchy
+```text
+Promise / Task Rejection
+         │
+         ▼
+     rejected?
+         │
+         ▼
+  <Failed> slot exists? ── yes ──> Render <Failed> slot locally
+         │
+         no
+         ▼
+  <Boundary> exists? ─── yes ──> Render <Boundary> fallback
+         │
+         no
+         ▼
+  createApp({ onError }) / reportGlobalError()
+```
+
 ---
 
+<a id="delay--reactive-async-task-lifecycle"></a>
 ### `<Delay>` — Reactive Async Task Lifecycle
 
 Owns and manages a reactive asynchronous operation. Automatically passes an `AbortController` signal to the task and aborts pending in-flight requests when Signal dependencies update or when the component unmounts:
@@ -252,44 +259,67 @@ function UserSearch() {
 
 ---
 
-### `<Boundary>` — Localized Error Boundary
+<a id="load--dynamic-component-switcher"></a>
+### `<Load>` — Dynamic Component Switcher
 
-Catches unhandled exceptions or rejected promises in its child component subtree, preventing application crashes:
+Dynamically renders and swaps components based on a reactive signal or component property without destroying surrounding DOM layout:
 
 ```javascript
-import { html, Boundary } from "primaljs";
+import { html, signal, Load } from "primaljs";
+import { AdminDashboard, UserDashboard } from "./dashboards.js";
 
-function App() {
+const currentRole = signal("user");
+
+function DashboardSwitcher() {
     return html`
-        <Boundary fallback=${(err, retry) => html`
-            <div class="error-card">
-                <p>Failed to load component: ${err.message}</p>
-                <button onclick=${retry}>Try Again</button>
-            </div>
-        `}>
-            <WidgetComponent />
-        </Boundary>
+        <div>
+            <button onclick=${() => currentRole.value = currentRole.value === "user" ? "admin" : "user"}>
+                Toggle Dashboard Role
+            </button>
+
+            <Load component=${() => currentRole.value === "admin" ? AdminDashboard : UserDashboard} />
+        </div>
     `;
 }
 ```
 
-#### Error Propagation Hierarchy
-```text
-Promise / Task Rejection
-         │
-         ▼
-     rejected?
-         │
-         ▼
-  <Failed> slot exists? ── yes ──> Render <Failed> slot locally
-         │
-         no
-         ▼
-  <Boundary> exists? ─── yes ──> Render <Boundary> fallback
-         │
-         no
-         ▼
-  createApp({ onError }) / reportGlobalError()
+---
+
+<a id="wait--promise-observation--unwrap"></a>
+### `<Wait>` — Promise Observation & Unwrap
+
+Observes an existing Promise (or Promise-returning function/Signal) and unwraps its resolved value while rendering `<Briefly>` loading fallback UI:
+
+```javascript
+import { html, Wait, Briefly, Failed } from "primaljs";
+
+const userPromise = fetch("/api/user/123").then(res => res.json());
+
+function UserProfile() {
+    return html`
+        <Wait for=${userPromise}>
+            ${user => html`
+                <div class="user-card">
+                    <h2>${user.name}</h2>
+                    <p>Role: ${user.role}</p>
+                </div>
+            `}
+
+            <Briefly>
+                <div class="spinner">Loading profile...</div>
+            </Briefly>
+
+            <Failed>
+                ${(err, retry) => html`
+                    <div class="error">
+                        <p>Failed: ${err.message}</p>
+                        <button onclick=${retry}>Retry</button>
+                    </div>
+                `}
+            </Failed>
+        </Wait>
+    `;
+}
 ```
 
 ---
