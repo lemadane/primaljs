@@ -37,35 +37,42 @@ export function setupPwa(options = {}) {
 
     if (!enabled) return;
 
+    const updateStrategy = (options && typeof options === "object" && options.updateStrategy) || "auto";
+
     const doRegister = () => {
         try {
-            navigator.serviceWorker.register(swPath, { scope: options.scope || "./" })
+            navigator.serviceWorker.register(swPath, { scope: (options && options.scope) || "./" })
                 .then(reg => {
-                    if (options.updateStrategy === "prompt" || options.updateStrategy === "auto") {
-                        const handleInstalling = (worker) => {
-                            if (!worker) return;
-                            worker.onstatechange = () => {
-                                if (worker.state === "installed" && navigator.serviceWorker.controller) {
-                                    if (options.updateStrategy === "auto") {
+                    const handleInstalling = (worker) => {
+                        if (!worker) return;
+                        worker.onstatechange = () => {
+                            if (worker.state === "installed") {
+                                if (navigator.serviceWorker.controller) {
+                                    if (updateStrategy === "auto") {
                                         try { worker.postMessage({ type: "SKIP_WAITING" }); } catch (_) {}
-                                        if (options.reloadOnUpdate !== false) {
+                                        if (options && options.reloadOnUpdate !== false) {
                                             window.location.reload();
                                         }
-                                    } else if (typeof options.onUpdateAvailable === "function") {
+                                    } else if (options && typeof options.onUpdateAvailable === "function") {
                                         options.onUpdateAvailable();
                                     }
+                                } else if (options && typeof options.onOfflineReady === "function") {
+                                    options.onOfflineReady();
                                 }
-                            };
+                            }
                         };
+                    };
 
-                        if (reg.waiting) {
-                            handleInstalling(reg.waiting);
-                        }
-
-                        reg.onupdatefound = () => {
-                            handleInstalling(reg.installing);
-                        };
+                    if (reg.waiting) {
+                        handleInstalling(reg.waiting);
                     }
+                    if (reg.installing) {
+                        handleInstalling(reg.installing);
+                    }
+
+                    reg.onupdatefound = () => {
+                        handleInstalling(reg.installing);
+                    };
                 })
                 .catch(err => {
                     reportGlobalError(err, { type: "pwa_registration", swPath });

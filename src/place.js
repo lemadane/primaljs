@@ -97,14 +97,12 @@ export function Place(props) {
     let currentTargetEl = null;
 
     function detachNodes() {
-        if (currentTargetEl) {
-            for (const node of placedNodes) {
-                if (node && node.parentNode === currentTargetEl) {
-                    currentTargetEl.removeChild(node);
-                }
+        for (const node of placedNodes) {
+            if (node && node.parentNode) {
+                node.parentNode.removeChild(node);
             }
-            currentTargetEl = null;
         }
+        currentTargetEl = null;
     }
 
     function attachNodes(targetEl) {

@@ -213,7 +213,7 @@ export function Load(props) {
  * @param {{ onError?: (error: Error, context?: any) => void }} [options]
  * @returns {AppHandle}
  */
-export function mount(Component, target, options = {}) {
+export function mount(Component, target, options = {}, initialProps = {}) {
     const targetEl = typeof target === "string" ? document.querySelector(target) : target;
     if (!targetEl) {
         throw new Error(`Mount target not found: ${target}`);
@@ -233,7 +233,7 @@ export function mount(Component, target, options = {}) {
         pushContext(rootCtx);
         let result;
         try {
-            result = typeof Component === "function" ? Component() : Component;
+            result = typeof Component === "function" ? Component(initialProps) : Component;
         } finally {
             popContext();
         }

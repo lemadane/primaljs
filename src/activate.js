@@ -57,7 +57,7 @@ export function hydrate(App, target, initialPropsOrOptions = {}, options = {}) {
         if (typeof console !== "undefined" && console.warn) {
             console.warn(`[PrimalJS hydrate]: Target container has no existing DOM to hydrate; falling back to mount().`);
         }
-        return mount(App, targetEl, initialProps);
+        return mount(App, targetEl, opts, initialProps);
     }
 
     const stateScript = document.getElementById("primal-state");

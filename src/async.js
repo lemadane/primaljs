@@ -347,21 +347,23 @@ export function Delay(props) {
 
         p.then(
             (res) => {
+                if (opId !== currentOpId) return;
                 if (activeTimeoutTimer !== null) {
                     clearTimeout(activeTimeoutTimer);
                     activeTimeoutTimer = null;
                 }
-                if (!isTimedOut && opId === currentOpId) {
+                if (!isTimedOut) {
                     state.value = { status: "resolved", data: res, error: null };
                 }
             },
             (err) => {
+                if (opId !== currentOpId) return;
                 if (activeTimeoutTimer !== null) {
                     clearTimeout(activeTimeoutTimer);
                     activeTimeoutTimer = null;
                 }
-                if (!isTimedOut && opId === currentOpId) {
-                    if (err && err.name === "AbortError" && !isTimedOut) {
+                if (!isTimedOut) {
+                    if (err && err.name === "AbortError") {
                         return;
                     }
                     state.value = { status: "rejected", data: null, error: err };

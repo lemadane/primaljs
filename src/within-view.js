@@ -47,7 +47,9 @@ export function WithinView(props) {
     let fallbackCtx = null;
     let fallbackDOM = null;
 
-    if (props.fallback !== undefined && props.fallback !== null) {
+    function renderFallback() {
+        if (props.fallback === undefined || props.fallback === null) return;
+        cleanupFallback();
         fallbackCtx = new ComponentContext("WithinViewFallback");
         if (parentCtx) {
             fallbackCtx.parent = parentCtx;
@@ -69,11 +71,13 @@ export function WithinView(props) {
             popContext();
         }
 
-        if (fallbackDOM) {
+        if (fallbackDOM && placeholderEl) {
             placeholderEl.appendChild(fallbackDOM);
             triggerMount(fallbackCtx);
         }
     }
+
+    renderFallback();
 
     fragment.appendChild(placeholderEl);
     fragment.appendChild(endAnchor);
@@ -155,7 +159,7 @@ export function WithinView(props) {
         const parent = startAnchor.parentNode || placeholderEl.parentNode;
         if (parent) {
             parent.insertBefore(childDOM, endAnchor);
-            if (placeholderEl.parentNode === parent) {
+            if (once && placeholderEl.parentNode === parent) {
                 parent.removeChild(placeholderEl);
             }
         } else {
@@ -174,6 +178,7 @@ export function WithinView(props) {
         if (isDisposed || once) return;
         isActivated = false;
         cleanupChild();
+        renderFallback();
     }
 
     const hasObserverSupport = typeof window !== "undefined" && typeof window.IntersectionObserver !== "undefined";

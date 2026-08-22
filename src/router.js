@@ -281,6 +281,7 @@ function matchRouteTree(routes, path) {
 export class Router {
     constructor(options = {}) {
         this.routes = options.routes || [];
+        this.mode = options.mode || "history";
         this.onError = options.onError || null;
         this.activeLayers = signal([]);
         this.activeParams = signal({});
@@ -290,6 +291,7 @@ export class Router {
         this.redirectDepth = 0;
 
         this.handlePopState = this.handlePopState.bind(this);
+        this.handleHashChange = this.handleHashChange.bind(this);
         this.link = this.link.bind(this);
 
         if (typeof window !== "undefined" && "scrollRestoration" in window.history) {
@@ -299,16 +301,57 @@ export class Router {
         }
     }
 
+    getHashRoute() {
+        if (typeof window === "undefined") return { path: "/", search: "", hash: "" };
+        let hashStr = window.location.hash || "#/";
+        if (hashStr.startsWith("#")) hashStr = hashStr.slice(1);
+        if (!hashStr.startsWith("/")) hashStr = "/" + hashStr;
+
+        const qIdx = hashStr.indexOf("?");
+        const hIdx = hashStr.indexOf("#");
+
+        let path = hashStr;
+        let search = "";
+        let innerHash = "";
+
+        if (qIdx !== -1 && (hIdx === -1 || qIdx < hIdx)) {
+            path = hashStr.substring(0, qIdx);
+            const rest = hashStr.substring(qIdx);
+            const restHIdx = rest.indexOf("#");
+            if (restHIdx !== -1) {
+                search = rest.substring(0, restHIdx);
+                innerHash = rest.substring(restHIdx);
+            } else {
+                search = rest;
+            }
+        } else if (hIdx !== -1) {
+            path = hashStr.substring(0, hIdx);
+            innerHash = hashStr.substring(hIdx);
+        }
+
+        return { path, search, hash: innerHash };
+    }
+
     init() {
         if (typeof window !== "undefined") {
-            window.addEventListener("popstate", this.handlePopState);
-            this.resolveRoute(window.location.pathname, window.location.search, window.location.hash);
+            if (this.mode === "hash") {
+                window.addEventListener("hashchange", this.handleHashChange);
+                const { path, search, hash } = this.getHashRoute();
+                this.resolveRoute(path, search, hash);
+            } else {
+                window.addEventListener("popstate", this.handlePopState);
+                this.resolveRoute(window.location.pathname, window.location.search, window.location.hash);
+            }
         }
     }
 
     destroy() {
         if (typeof window !== "undefined") {
-            window.removeEventListener("popstate", this.handlePopState);
+            if (this.mode === "hash") {
+                window.removeEventListener("hashchange", this.handleHashChange);
+            } else {
+                window.removeEventListener("popstate", this.handlePopState);
+            }
         }
         if (globalRouterInstance === this) {
             globalRouterInstance = null;
@@ -440,25 +483,46 @@ export class Router {
         this.resolveRoute(window.location.pathname, window.location.search, window.location.hash);
     }
 
+    handleHashChange() {
+        const { path, search, hash } = this.getHashRoute();
+        this.resolveRoute(path, search, hash);
+    }
+
     navigate(to, options = {}) {
         if (typeof window === "undefined") return;
 
-        const targetUrl = new URL(to, window.location.origin);
-        const nextPath = targetUrl.pathname;
-        const nextSearch = targetUrl.search;
-        const nextHash = targetUrl.hash;
-
-        if (options.replace) {
-            window.history.replaceState({}, "", targetUrl.href);
+        if (this.mode === "hash") {
+            let targetHash = to.startsWith("#") ? to : "#" + (to.startsWith("/") ? to : "/" + to);
+            if (options.replace) {
+                const base = window.location.pathname + window.location.search;
+                window.location.replace(base + targetHash);
+            } else {
+                window.location.hash = targetHash;
+            }
+            const { path, search, hash } = this.getHashRoute();
+            this.resolveRoute(path, search, hash);
         } else {
-            window.history.pushState({}, "", targetUrl.href);
-        }
+            const targetUrl = new URL(to, window.location.origin);
+            const nextPath = targetUrl.pathname;
+            const nextSearch = targetUrl.search;
+            const nextHash = targetUrl.hash;
 
-        this.resolveRoute(nextPath, nextSearch, nextHash);
+            if (options.replace) {
+                window.history.replaceState({}, "", targetUrl.href);
+            } else {
+                window.history.pushState({}, "", targetUrl.href);
+            }
+
+            this.resolveRoute(nextPath, nextSearch, nextHash);
+        }
     }
 
     link(props) {
-        const href = props.href || "#";
+        let rawHref = props.href || "#";
+        let href = rawHref;
+        if (this.mode === "hash" && rawHref !== "#" && !rawHref.startsWith("#")) {
+            href = "#" + (rawHref.startsWith("/") ? rawHref : "/" + rawHref);
+        }
         const replace = props.replace || false;
         const children = props.children || [];
 
@@ -467,7 +531,7 @@ export class Router {
                 return;
             }
             e.preventDefault();
-            this.navigate(href, { replace });
+            this.navigate(rawHref, { replace });
         };
 
         return html`<a href=${href} onclick=${handleClick}>${children}</a>`;

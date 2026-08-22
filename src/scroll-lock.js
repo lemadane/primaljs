@@ -17,8 +17,7 @@ function _getWinScrollLock() {
     return null;
 }
 
-let lockCount = 0;
-let preservedState = null;
+const targetLocks = new Map();
 
 function calculateScrollbarWidth() {
     const win = _getWinScrollLock();
@@ -30,68 +29,101 @@ function calculateScrollbarWidth() {
     return Math.max(0, innerWidth - clientWidth);
 }
 
-function applyGlobalScrollLock() {
+function resolveTargetElement(target) {
     const doc = _getDocScrollLock();
-    if (!doc || !doc.body) return;
+    if (!target) return doc ? doc.body : null;
 
-    const body = doc.body;
-    const scrollbarWidth = calculateScrollbarWidth();
-    const computedPaddingRight = typeof window !== "undefined" && window.getComputedStyle ? window.getComputedStyle(body).paddingRight : "0px";
-
-    preservedState = {
-        overflow: body.style.overflow,
-        overflowX: body.style.overflowX,
-        overflowY: body.style.overflowY,
-        paddingRight: body.style.paddingRight
-    };
-
-    body.style.overflow = "hidden";
-
-    if (scrollbarWidth > 0) {
-        const basePadding = parseFloat(computedPaddingRight) || 0;
-        body.style.paddingRight = `${basePadding + scrollbarWidth}px`;
+    let el = target;
+    if (typeof target === "object" && target !== null && "current" in target) {
+        el = target.current;
     }
+    if (typeof el === "string" && doc) {
+        el = doc.querySelector(el);
+    }
+    if (typeof Element !== "undefined" && el instanceof Element) {
+        return el;
+    }
+    return doc ? doc.body : null;
 }
 
-function releaseGlobalScrollLock() {
+function applyScrollLockToElement(el) {
+    if (!el) return;
     const doc = _getDocScrollLock();
-    if (!doc || !doc.body || !preservedState) return;
+    const isBody = doc && (el === doc.body || el === doc.documentElement);
 
-    const body = doc.body;
-    body.style.overflow = preservedState.overflow;
-    body.style.overflowX = preservedState.overflowX;
-    body.style.overflowY = preservedState.overflowY;
-    body.style.paddingRight = preservedState.paddingRight;
+    let state = targetLocks.get(el);
+    if (!state) {
+        const computedPaddingRight = typeof window !== "undefined" && window.getComputedStyle ? window.getComputedStyle(el).paddingRight : "0px";
+        state = {
+            count: 0,
+            preservedState: {
+                overflow: el.style.overflow,
+                overflowX: el.style.overflowX,
+                overflowY: el.style.overflowY,
+                paddingRight: el.style.paddingRight
+            }
+        };
+        targetLocks.set(el, state);
+    }
 
-    preservedState = null;
+    if (state.count === 0) {
+        el.style.overflow = "hidden";
+        if (isBody) {
+            const scrollbarWidth = calculateScrollbarWidth();
+            if (scrollbarWidth > 0) {
+                const basePadding = parseFloat(state.preservedState.paddingRight) || 0;
+                el.style.paddingRight = `${basePadding + scrollbarWidth}px`;
+            }
+        }
+    }
+    state.count++;
+}
+
+function releaseScrollLockFromElement(el) {
+    if (!el) return;
+    const state = targetLocks.get(el);
+    if (!state) return;
+
+    state.count--;
+    if (state.count <= 0) {
+        el.style.overflow = state.preservedState.overflow;
+        el.style.overflowX = state.preservedState.overflowX;
+        el.style.overflowY = state.preservedState.overflowY;
+        el.style.paddingRight = state.preservedState.paddingRight;
+        targetLocks.delete(el);
+    }
 }
 
 /**
  * Temporarily locks page or container scrolling with automatic lifecycle cleanup and reference counting.
  *
- * @param {Element | object} [target] - Optional target element or ref (defaults to page body)
+ * @param {Element | object | string} [target] - Optional target element or ref (defaults to page body)
  * @returns {() => void} Unlock function
  */
 export function scrollLock(target) {
-    let isLocked = true;
+    let ownsLock = true;
+    let lockCurrentlyAcquired = false;
 
     function acquire() {
-        if (!isLocked) return;
-        if (lockCount === 0) {
-            applyGlobalScrollLock();
-        }
-        lockCount++;
+        if (!ownsLock || lockCurrentlyAcquired) return;
+        const el = resolveTargetElement(target);
+        if (!el) return;
+        lockCurrentlyAcquired = true;
+        applyScrollLockToElement(el);
     }
 
     function release() {
-        if (!isLocked) return;
-        isLocked = false;
-        if (lockCount > 0) {
-            lockCount--;
-            if (lockCount === 0) {
-                releaseGlobalScrollLock();
-            }
+        if (!lockCurrentlyAcquired) return;
+        const el = resolveTargetElement(target);
+        lockCurrentlyAcquired = false;
+        if (el) {
+            releaseScrollLockFromElement(el);
         }
+    }
+
+    function unlock() {
+        release();
+        ownsLock = false;
     }
 
     acquire();
@@ -103,32 +135,25 @@ export function scrollLock(target) {
         });
 
         ctx.addDeactivateHook(() => {
-            if (isLocked && lockCount > 0) {
-                lockCount--;
-                if (lockCount === 0) {
-                    releaseGlobalScrollLock();
-                }
-            }
+            release();
         });
 
         ctx.addReactivateHook(() => {
-            if (isLocked) {
-                if (lockCount === 0) {
-                    applyGlobalScrollLock();
-                }
-                lockCount++;
+            if (ownsLock) {
+                acquire();
             }
         });
-    }
-
-    function unlock() {
-        release();
     }
 
     return unlock;
 }
 
 export function _resetScrollLockStateForTest() {
-    lockCount = 0;
-    preservedState = null;
+    for (const [el, state] of targetLocks.entries()) {
+        el.style.overflow = state.preservedState.overflow;
+        el.style.overflowX = state.preservedState.overflowX;
+        el.style.overflowY = state.preservedState.overflowY;
+        el.style.paddingRight = state.preservedState.paddingRight;
+    }
+    targetLocks.clear();
 }

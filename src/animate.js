@@ -32,6 +32,12 @@ function listenAnimationEnd(elements, onComplete, fallbackMs) {
 
     let completed = false;
     let timeoutId = null;
+    const pendingElements = new Set(elements.filter(el => el && el.addEventListener));
+
+    if (pendingElements.size === 0) {
+        onComplete();
+        return () => {};
+    }
 
     const cleanup = () => {
         if (timeoutId) {
@@ -48,18 +54,19 @@ function listenAnimationEnd(elements, onComplete, fallbackMs) {
 
     const handleEnd = (evt) => {
         if (completed) return;
-        if (evt && evt.target && elements.some(el => el === evt.target || el.contains(evt.target))) {
-            completed = true;
-            cleanup();
-            onComplete();
+        if (evt && evt.target && pendingElements.has(evt.target)) {
+            pendingElements.delete(evt.target);
+            if (pendingElements.size === 0) {
+                completed = true;
+                cleanup();
+                onComplete();
+            }
         }
     };
 
-    for (const el of elements) {
-        if (el && el.addEventListener) {
-            el.addEventListener("animationend", handleEnd);
-            el.addEventListener("transitionend", handleEnd);
-        }
+    for (const el of pendingElements) {
+        el.addEventListener("animationend", handleEnd);
+        el.addEventListener("transitionend", handleEnd);
     }
 
     const durationMs = typeof fallbackMs === "number" && fallbackMs > 0 ? fallbackMs : 500;
