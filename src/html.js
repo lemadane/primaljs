@@ -14,7 +14,7 @@ import {
     destroyContext
 } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";
-import { clearAnchorRange, insertAfterAnchor } from "./mount.js";
+import { clearAnchorRange, insertAfterAnchor } from "./load.js";
 
 const templateCache = new WeakMap();
 
@@ -338,6 +338,7 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
 
     const targetNodes = cached.instructions.map(spec => {
         if (isRootNode && spec.path.length > 0 && spec.path[0] === 0) {
+            if (spec.path.length === 1) return existingDOMNode;
             return getNodeByPath(existingDOMNode, spec.path.slice(1));
         }
         return getNodeByPath(existingDOMNode, spec.path);
@@ -737,6 +738,15 @@ function bindAttribute(targetElement, attrName, value, ctx, prefix = "", suffix 
         return;
     }
 
+    if (attrName === "value" && targetElement.tagName === "INPUT") {
+        if (targetElement.value && targetElement.value !== targetElement.getAttribute("value")) {
+            const rawVal = (parts && templateValues && parts[1]) ? templateValues[parts[1].valueIndex] : value;
+            if (isSignal(rawVal)) {
+                rawVal.value = targetElement.value;
+            }
+        }
+    }
+
     if (attrName === "style" && parts && parts.length === 3 && parts[0].static === "" && parts[2].static === "") {
         const styleVal = templateValues ? templateValues[parts[1].valueIndex] : value;
         if (typeof styleVal === "object" && styleVal !== null && !isSignal(styleVal)) {
@@ -955,19 +965,40 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
         popContext();
     }
 
-    const compDOM = convertToDOMNode(compResult, compCtx);
-    parent.replaceChild(compDOM, placeholderEl);
+    const isPlaceholder = placeholderEl.nodeName.endsWith("-COMPONENT") || (capitalTags && capitalTags.has(placeholderEl.nodeName)) || (capitalTags && capitalTags.has(placeholderEl.nodeName.replace(/-COMPONENT$/i, "")));
+
+    if (!isPlaceholder && compResult instanceof TemplateResult && placeholderEl.nodeType === Node.ELEMENT_NODE) {
+        activateTemplate(placeholderEl, compResult, compCtx, true);
+    } else {
+        const compDOM = convertToDOMNode(compResult, compCtx);
+        parent.replaceChild(compDOM, placeholderEl);
+    }
 }
 
 /**
  * Resolves inner placeholders (comments, attributes) inside a component placeholder's subtree.
  */
 export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags = new Set()) {
-    if (!rootNode || rootNode.nodeType !== Node.ELEMENT_NODE) return;
+    if (!rootNode) return;
 
-    const rootClean = rootNode.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
-    if (capitalTags.has(rootClean) || getComponent(rootClean) || rootNode.hasAttribute("primal-comp")) {
-        return;
+    if (rootNode.nodeType === Node.ELEMENT_NODE) {
+        const cleanName = rootNode.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
+        if (!capitalTags.has(cleanName) && !getComponent(cleanName) && !rootNode.hasAttribute("primal-comp")) {
+            for (let i = rootNode.attributes.length - 1; i >= 0; i--) {
+                const attr = rootNode.attributes[i];
+                if (attr.name.startsWith("primal-attr-")) {
+                    const idx = parseInt(attr.name.replace("primal-attr-", ""), 10);
+                    const targetAttrName = attr.value;
+                    const val = templateValues ? templateValues[idx] : undefined;
+                    if (targetAttrName.toLowerCase().startsWith("on")) {
+                        bindEvent(rootNode, targetAttrName, val, ctx);
+                    } else {
+                        bindAttribute(rootNode, targetAttrName, val, ctx);
+                    }
+                    rootNode.removeAttribute(attr.name);
+                }
+            }
+        }
     }
 
     const childrenToProcess = Array.from(rootNode.childNodes || []);
@@ -978,12 +1009,16 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
             const text = node.nodeValue ? node.nodeValue.trim() : "";
             if (text.startsWith("primal-ph-")) {
                 const idx = parseInt(text.replace("primal-ph-", ""), 10);
-                const val = templateValues[idx];
+                const val = templateValues ? templateValues[idx] : undefined;
                 bindContent(node, val, ctx);
             }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
             const cleanName = node.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
             if (capitalTags.has(cleanName) || getComponent(cleanName) || node.hasAttribute("primal-comp")) {
+                const compFn = getComponent(cleanName);
+                if (compFn) {
+                    instantiateComponentNode(node, compFn, templateValues, ctx, capitalTags);
+                }
                 continue;
             }
             for (let i = node.attributes.length - 1; i >= 0; i--) {

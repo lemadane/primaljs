@@ -26,6 +26,7 @@ globalThis.DocumentFragment = dom.window.DocumentFragment;
 globalThis.customElements = dom.window.customElements;
 globalThis.Event = dom.window.Event;
 globalThis.CustomEvent = dom.window.CustomEvent;
+globalThis.KeyboardEvent = dom.window.KeyboardEvent;
 globalThis.AbortController = globalThis.AbortController || dom.window.AbortController;
 globalThis.AbortSignal = globalThis.AbortSignal || dom.window.AbortSignal;
 

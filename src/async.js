@@ -8,6 +8,80 @@ import { getCurrentContext } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";
 
 /**
+ * Custom Timeout Error class for <Wait> and <Delay> operation timeouts.
+ */
+export class TimeoutError extends Error {
+    constructor(message = "Operation timed out") {
+        super(message);
+        this.name = "TimeoutError";
+    }
+}
+
+/**
+ * Validates and normalizes timeout option values.
+ *
+ * @param {any} value
+ * @returns {number | null}
+ */
+export function normalizeTimeout(value) {
+    if (value == null) return null;
+    const timeout = Number(value);
+    if (!Number.isFinite(timeout) || timeout < 0) {
+        throw new TypeError("<Wait> timeout must be a non-negative number");
+    }
+    return timeout;
+}
+
+/**
+ * Safely observes a Promise with a timeout and cleanup callback.
+ *
+ * @param {Promise<any>} promise
+ * @param {number | null} timeout
+ * @param {{ resolve: (val: any) => void, reject: (err: any) => void }} handlers
+ * @returns {() => void} Cleanup function
+ */
+export function observePromise(promise, timeout, handlers) {
+    let active = true;
+    let timer = null;
+
+    const succeed = (value) => {
+        if (!active) return;
+        active = false;
+        if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        handlers.resolve(value);
+    };
+
+    const fail = (error) => {
+        if (!active) return;
+        active = false;
+        if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+        }
+        handlers.reject(error);
+    };
+
+    Promise.resolve(promise).then(succeed, fail);
+
+    if (timeout != null) {
+        timer = setTimeout(() => {
+            fail(new TimeoutError(`Operation timed out after ${timeout}ms`));
+        }, timeout);
+    }
+
+    return () => {
+        active = false;
+        if (timer !== null) {
+            clearTimeout(timer);
+            timer = null;
+        }
+    };
+}
+
+/**
  * Slot marker component for pending/loading state inside <Wait> or <Delay>.
  * @param {{ children?: any }} props
  */
@@ -97,7 +171,7 @@ function renderSlot(slot, arg1, arg2) {
 /**
  * Declarative Promise Unwrap & Observation Component.
  *
- * @param {{ for?: Promise<any> | (() => Promise<any>) | import("./signal.js").Signal<Promise<any>>, children?: any, __templateValues?: any[] }} props
+ * @param {{ for?: Promise<any> | (() => Promise<any>) | import("./signal.js").Signal<Promise<any>>, timeout?: number, children?: any, __templateValues?: any[] }} props
  */
 export function Wait(props) {
     const state = signal({ status: "pending", data: null, error: null });
@@ -105,9 +179,21 @@ export function Wait(props) {
     const templateValues = props ? props.__templateValues : [];
     const { resolvedSlot, brieflySlot, failedSlot } = parseSlots(props ? props.children : null, templateValues);
 
+    const rawTimeout = props ? (props.timeout !== undefined ? props.timeout : props.Timeout) : undefined;
+    const timeout = normalizeTimeout(rawTimeout);
+
     let currentOpId = 0;
+    let activeCancelObservation = null;
+
+    const cleanupObservation = () => {
+        if (activeCancelObservation) {
+            activeCancelObservation();
+            activeCancelObservation = null;
+        }
+    };
 
     const runWait = () => {
+        cleanupObservation();
         const opId = ++currentOpId;
         state.value = { status: "pending", data: null, error: null };
 
@@ -127,18 +213,18 @@ export function Wait(props) {
             return;
         }
 
-        p.then(
-            (res) => {
+        activeCancelObservation = observePromise(p, timeout, {
+            resolve(res) {
                 if (opId === currentOpId) {
                     state.value = { status: "resolved", data: res, error: null };
                 }
             },
-            (err) => {
+            reject(err) {
                 if (opId === currentOpId) {
                     state.value = { status: "rejected", data: null, error: err };
                 }
             }
-        );
+        });
     };
 
     const retry = () => {
@@ -153,6 +239,7 @@ export function Wait(props) {
         ctx.addEffect(() => {
             disposer();
             currentOpId++;
+            cleanupObservation();
         });
     }
 
@@ -185,7 +272,7 @@ export function Wait(props) {
 /**
  * Declarative Reactive Task Component (owns AbortController & task lifecycle).
  *
- * @param {{ task?: (options: { signal: AbortSignal }) => Promise<any>, run?: any, children?: any, __templateValues?: any[] }} props
+ * @param {{ task?: (options: { signal: AbortSignal }) => Promise<any>, run?: any, timeout?: number, children?: any, __templateValues?: any[] }} props
  */
 export function Delay(props) {
     const state = signal({ status: "pending", data: null, error: null });
@@ -193,14 +280,26 @@ export function Delay(props) {
     const templateValues = props ? props.__templateValues : [];
     const { resolvedSlot, brieflySlot, failedSlot } = parseSlots(props ? props.children : null, templateValues);
 
+    const rawTimeout = props ? (props.timeout !== undefined ? props.timeout : props.Timeout) : undefined;
+    const timeout = normalizeTimeout(rawTimeout);
+
     let currentOpId = 0;
     let activeAbortController = null;
+    let activeTimeoutTimer = null;
 
-    const runTask = () => {
+    const cleanupTask = () => {
+        if (activeTimeoutTimer !== null) {
+            clearTimeout(activeTimeoutTimer);
+            activeTimeoutTimer = null;
+        }
         if (activeAbortController) {
             activeAbortController.abort();
             activeAbortController = null;
         }
+    };
+
+    const runTask = () => {
+        cleanupTask();
 
         const controller = typeof AbortController !== "undefined" ? new AbortController() : null;
         activeAbortController = controller;
@@ -214,6 +313,20 @@ export function Delay(props) {
             return;
         }
 
+        let isTimedOut = false;
+        if (timeout != null) {
+            activeTimeoutTimer = setTimeout(() => {
+                isTimedOut = true;
+                const err = new TimeoutError(`Operation timed out after ${timeout}ms`);
+                if (controller) {
+                    try { controller.abort(err); } catch (_) {}
+                }
+                if (opId === currentOpId) {
+                    state.value = { status: "rejected", data: null, error: err };
+                }
+            }, timeout);
+        }
+
         let p;
         try {
             p = taskFn({ signal: controller ? controller.signal : undefined });
@@ -222,19 +335,33 @@ export function Delay(props) {
         }
 
         if (!p || typeof p.then !== "function") {
-            state.value = { status: "resolved", data: p, error: null };
+            if (activeTimeoutTimer !== null) {
+                clearTimeout(activeTimeoutTimer);
+                activeTimeoutTimer = null;
+            }
+            if (!isTimedOut && opId === currentOpId) {
+                state.value = { status: "resolved", data: p, error: null };
+            }
             return;
         }
 
         p.then(
             (res) => {
-                if (opId === currentOpId) {
+                if (activeTimeoutTimer !== null) {
+                    clearTimeout(activeTimeoutTimer);
+                    activeTimeoutTimer = null;
+                }
+                if (!isTimedOut && opId === currentOpId) {
                     state.value = { status: "resolved", data: res, error: null };
                 }
             },
             (err) => {
-                if (opId === currentOpId) {
-                    if (err && err.name === "AbortError") {
+                if (activeTimeoutTimer !== null) {
+                    clearTimeout(activeTimeoutTimer);
+                    activeTimeoutTimer = null;
+                }
+                if (!isTimedOut && opId === currentOpId) {
+                    if (err && err.name === "AbortError" && !isTimedOut) {
                         return;
                     }
                     state.value = { status: "rejected", data: null, error: err };
@@ -255,10 +382,7 @@ export function Delay(props) {
         ctx.addEffect(() => {
             disposer();
             currentOpId++;
-            if (activeAbortController) {
-                activeAbortController.abort();
-                activeAbortController = null;
-            }
+            cleanupTask();
         });
     }
 

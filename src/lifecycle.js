@@ -101,11 +101,55 @@ export function triggerMount(ctx) {
         } catch (err) {
             reportGlobalError(err, { type: "onMount", component: ctx.name, ctx: ctx });
         }
-    };
+    }
     ctx.mountHooks = [];
 
     for (const child of [...ctx.children]) {
         triggerMount(child);
+    }
+}
+
+/**
+ * Triggers deactivate hooks recursively on a context subtree without destroying it.
+ *
+ * @param {ComponentContext} ctx
+ */
+export function deactivateContext(ctx) {
+    if (!ctx || ctx.isDestroyed || ctx.isKept) return;
+    ctx.isKept = true;
+
+    for (const hook of ctx.deactivateHooks) {
+        try {
+            hook();
+        } catch (err) {
+            reportGlobalError(err, { type: "deactivate", component: ctx.name, ctx: ctx });
+        }
+    }
+
+    for (const child of [...ctx.children]) {
+        deactivateContext(child);
+    }
+}
+
+/**
+ * Triggers reactivate hooks recursively on a context subtree when restored from cache.
+ *
+ * @param {ComponentContext} ctx
+ */
+export function reactivateContext(ctx) {
+    if (!ctx || ctx.isDestroyed || !ctx.isKept) return;
+    ctx.isKept = false;
+
+    for (const hook of ctx.reactivateHooks) {
+        try {
+            hook();
+        } catch (err) {
+            reportGlobalError(err, { type: "reactivate", component: ctx.name, ctx: ctx });
+        }
+    }
+
+    for (const child of [...ctx.children]) {
+        reactivateContext(child);
     }
 }
 
@@ -118,4 +162,3 @@ export function destroyContext(ctx) {
     if (!ctx) return;
     ctx.dispose();
 }
-

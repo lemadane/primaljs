@@ -11,7 +11,10 @@ import {
     Delay,
     Briefly,
     Failed,
-    Boundary
+    Guard,
+    Boundary,
+    TimeoutError,
+    normalizeTimeout
 } from "../src/index.js";
 
 describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Failed>)", () => {
@@ -120,7 +123,7 @@ describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Faile
         assert.equal(container.querySelector(".data").textContent, "Success Data");
     });
 
-    it("3. <Wait>: propagates error to <Boundary> when <Failed> is absent", async () => {
+    it("3. <Wait>: propagates error to <Guard> when <Failed> is absent", async () => {
         let rejectFn;
         const promise = new Promise((_, reject) => {
             rejectFn = reject;
@@ -128,7 +131,7 @@ describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Faile
 
         function App() {
             return html`
-                <Boundary fallback=${(err) => html`<div class="boundary-error">Boundary Caught: ${err.message}</div>`}>
+                <Guard fallback=${(err) => html`<div class="boundary-error">Guard Caught: ${err.message}</div>`}>
                     <Wait for=${promise}>
                         ${data => html`<div>${data}</div>`}
 
@@ -136,7 +139,7 @@ describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Faile
                             <div class="loading">Loading...</div>
                         </Briefly>
                     </Wait>
-                </Boundary>
+                </Guard>
             `;
         }
 
@@ -149,7 +152,7 @@ describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Faile
         rejectFn(new Error("Fatal Async Error"));
         await new Promise(r => setTimeout(r, 10));
 
-        assert.equal(container.querySelector(".boundary-error").textContent, "Boundary Caught: Fatal Async Error");
+        assert.equal(container.querySelector(".boundary-error").textContent, "Guard Caught: Fatal Async Error");
     });
 
     it("4. <Wait>: discards stale Promise resolutions when for prop updates", async () => {
@@ -233,5 +236,154 @@ describe("PrimalJS Async Resource Components (<Wait>, <Delay>, <Briefly>, <Faile
 
         assert.ok(abortedIds.includes(1), "Task for userId 1 must be aborted");
         assert.equal(container.querySelector(".user").textContent, "User Data for ID 2");
+    });
+
+    it("8. TimeoutError class properties & normalizeTimeout validation", () => {
+        const err = new TimeoutError("Custom timeout");
+        assert.ok(err instanceof Error);
+        assert.ok(err instanceof TimeoutError);
+        assert.equal(err.name, "TimeoutError");
+        assert.equal(err.message, "Custom timeout");
+
+        assert.equal(normalizeTimeout(null), null);
+        assert.equal(normalizeTimeout(undefined), null);
+        assert.equal(normalizeTimeout(500), 500);
+        assert.equal(normalizeTimeout("200"), 200);
+        assert.equal(normalizeTimeout(0), 0);
+
+        assert.throws(() => normalizeTimeout(-100), TypeError);
+        assert.throws(() => normalizeTimeout("invalid"), TypeError);
+    });
+
+    it("9. <Wait for=${promise} timeout=${50}> times out and renders <Failed> slot with TimeoutError", async () => {
+        const neverSettles = new Promise(() => {});
+
+        function App() {
+            return html`
+                <Wait for=${neverSettles} timeout=${50}>
+                    ${val => html`<div>${val}</div>`}
+
+                    <Briefly>
+                        <div class="spinner">Loading...</div>
+                    </Briefly>
+
+                    <Failed>
+                        ${(err) => html`
+                            <div class="timeout-msg">
+                                ${err instanceof TimeoutError ? "Request Timed Out" : err.message}
+                            </div>
+                        `}
+                    </Failed>
+                </Wait>
+            `;
+        }
+
+        mount(App, container);
+
+        assert.equal(container.querySelector(".spinner").textContent, "Loading...");
+
+        await new Promise(r => setTimeout(r, 120));
+
+        assert.equal(container.querySelector(".timeout-msg").textContent.trim(), "Request Timed Out");
+    });
+
+    it("10. <Wait for=${promise} timeout=${500}> resolves normally when promise settles quickly", async () => {
+        const quickPromise = new Promise(resolve => setTimeout(() => resolve("Quick Result"), 30));
+
+        function App() {
+            return html`
+                <Wait for=${quickPromise} timeout=${500}>
+                    ${val => html`<div class="result">${val}</div>`}
+
+                    <Briefly>
+                        <div class="spinner">Loading...</div>
+                    </Briefly>
+                </Wait>
+            `;
+        }
+
+        mount(App, container);
+
+        await new Promise(r => setTimeout(r, 80));
+
+        assert.equal(container.querySelector(".result").textContent.trim(), "Quick Result");
+    });
+
+    it("11. <Wait> timer is cancelled on parent component unmount", async () => {
+        let timerTriggeredAfterUnmount = false;
+        const slowPromise = new Promise(() => {});
+        const show = signal(true);
+
+        function App() {
+            return html`
+                <div>
+                    ${() => show.value ? html`
+                        <Wait for=${slowPromise} timeout=${50}>
+                            <div>Data</div>
+                            <Briefly>Loading</Briefly>
+                            <Failed>
+                                ${() => {
+                                    timerTriggeredAfterUnmount = true;
+                                    return html`<div>Failed</div>`;
+                                }}
+                            </Failed>
+                        </Wait>
+                    ` : null}
+                </div>
+            `;
+        }
+
+        mount(App, container);
+
+        // Unmount parent BEFORE timeout expires
+        show.value = false;
+
+        await new Promise(r => setTimeout(r, 100));
+
+        assert.equal(timerTriggeredAfterUnmount, false, "Stale timeout timer must not trigger on unmounted component");
+    });
+
+    it("12. <Delay task=${task} timeout=${50}> aborts task AbortController and renders TimeoutError", async () => {
+        let taskSignalAborted = false;
+        let abortReason = null;
+
+        function App() {
+            return html`
+                <Delay timeout=${50} task=${({ signal }) => {
+                    return new Promise((resolve, reject) => {
+                        if (signal) {
+                            signal.addEventListener("abort", () => {
+                                taskSignalAborted = true;
+                                abortReason = signal.reason;
+                                reject(signal.reason);
+                            });
+                        }
+                    });
+                }}>
+                    ${data => html`<div>${data}</div>`}
+
+                    <Briefly>
+                        <div class="delay-loading">Delaying...</div>
+                    </Briefly>
+
+                    <Failed>
+                        ${(err) => html`
+                            <div class="delay-timeout">
+                                ${err instanceof TimeoutError ? "Delay Timed Out" : err.message}
+                            </div>
+                        `}
+                    </Failed>
+                </Delay>
+            `;
+        }
+
+        mount(App, container);
+
+        assert.equal(container.querySelector(".delay-loading").textContent.trim(), "Delaying...");
+
+        await new Promise(r => setTimeout(r, 120));
+
+        assert.equal(taskSignalAborted, true, "Task AbortSignal must be aborted on timeout");
+        assert.equal(container.querySelector(".delay-timeout").textContent.trim(), "Delay Timed Out");
     });
 });

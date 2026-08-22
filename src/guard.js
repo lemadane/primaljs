@@ -1,5 +1,5 @@
 /**
- * PrimalJS Localized UI Error Boundary Component
+ * PrimalJS Localized UI Guard (Error Boundary) Component
  */
 
 import { html } from "./html.js";
@@ -7,13 +7,14 @@ import { signal } from "./signal.js";
 import { getCurrentContext } from "./lifecycle.js";
 
 /**
- * Local UI Error Boundary Component.
+ * Local UI Guard (Error Boundary) Component.
  * Catches unhandled errors within its child context tree and renders a fallback UI.
  *
  * @param {{ fallback?: ((error: Error, retry: () => void) => any) | any, children?: any }} props
  * @returns {import("./html.js").TemplateResult}
  */
-export function Boundary(props) {
+export function Guard(props) {
+    props = props || {};
     const errorSignal = signal(null);
     const parentCtx = getCurrentContext();
 
@@ -23,20 +24,26 @@ export function Boundary(props) {
 
     if (parentCtx) {
         parentCtx.localErrorHandler = (err) => {
-            errorSignal.value = err;
+            errorSignal.value = err || new Error("Unknown error");
             return true; // Error handled locally
         };
     }
 
     return html`
         ${() => {
-            if (errorSignal.value) {
+            const err = errorSignal.value;
+            if (err) {
                 if (typeof props.fallback === "function") {
-                    return props.fallback(errorSignal.value, retry);
+                    return props.fallback(err, retry);
                 }
-                return props.fallback || html`<div class="primal-error-boundary">An error occurred: ${errorSignal.value.message || String(errorSignal.value)}</div>`;
+                return props.fallback || html`<div class="primal-error-boundary">An error occurred: ${err.message || String(err)}</div>`;
             }
             return props.children;
         }}
     `;
+}
+
+/** Backward compatibility alias for Guard */
+export function Boundary(props) {
+    return Guard(props);
 }

@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import "./setup.js";
 import { signal } from "../src/signal.js";
 import { html } from "../src/html.js";
-import { mount } from "../src/mount.js";
+import { mount } from "../src/load.js";
 import { createRouter, RouteOutlet, useRoute, navigate } from "../src/router.js";
 import { register } from "../src/registry.js";
 import { onMount, getCurrentContext } from "../src/lifecycle.js";

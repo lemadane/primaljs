@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import "./setup.js";
 import { signal } from "../src/signal.js";
 import { html } from "../src/html.js";
-import { mount } from "../src/mount.js";
+import { mount } from "../src/load.js";
 
 // Define a test Custom Element
 class UserBadge extends HTMLElement {

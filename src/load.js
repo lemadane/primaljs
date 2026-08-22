@@ -1,5 +1,5 @@
 /**
- * PrimalJS DOM Mounting & Declarative <Mount> Component Switcher Runtime
+ * PrimalJS DOM Mounting & Declarative <Load> Component Switcher Runtime
  */
 
 import { isSignal, effect, untrack } from "./signal.js";
@@ -9,9 +9,12 @@ import {
     popContext,
     getCurrentContext,
     triggerMount,
-    destroyContext
+    destroyContext,
+    deactivateContext,
+    reactivateContext
 } from "./lifecycle.js";
 import { convertToDOMNode } from "./html.js";
+import { getKeepCache } from "./keep.js";
 
 export function clearAnchorRange(startAnchor, endAnchor) {
     const parent = startAnchor.parentNode;
@@ -58,13 +61,43 @@ export function Load(props) {
 
     let activeCompFn = null;
     let activeCompCtx = null;
+    let activeCacheKey = null;
 
-    function cleanupActiveComp() {
-        if (activeCompCtx) {
+    const keepCache = getKeepCache(ctx);
+
+    function detachActiveComp() {
+        if (!activeCompCtx) return;
+
+        if (keepCache && activeCacheKey !== null) {
+            const nodes = [];
+            const frag = document.createDocumentFragment();
+            const parent = startAnchor.parentNode;
+            if (parent) {
+                let current = startAnchor.nextSibling;
+                while (current && current !== endAnchor) {
+                    const next = current.nextSibling;
+                    nodes.push(current);
+                    frag.appendChild(current);
+                    current = next;
+                }
+            }
+
+            deactivateContext(activeCompCtx);
+
+            keepCache.set(activeCacheKey, {
+                key: activeCacheKey,
+                compCtx: activeCompCtx,
+                fragment: frag,
+                nodes: nodes
+            });
+        } else {
             destroyContext(activeCompCtx);
-            activeCompCtx = null;
+            clearAnchorRange(startAnchor, endAnchor);
         }
-        clearAnchorRange(startAnchor, endAnchor);
+
+        activeCompCtx = null;
+        activeCompFn = null;
+        activeCacheKey = null;
     }
 
     const disposer = effect(() => {
@@ -76,8 +109,7 @@ export function Load(props) {
         }
 
         if (compFn === null || compFn === undefined) {
-            cleanupActiveComp();
-            activeCompFn = null;
+            detachActiveComp();
             return;
         }
 
@@ -85,13 +117,46 @@ export function Load(props) {
             throw new Error("<Load> 'component' prop must be a function component, Signal, null, or undefined.");
         }
 
-        if (compFn === activeCompFn) {
+        let rawKey = props ? (props.key !== undefined ? props.key : props.Key) : undefined;
+        if (rawKey === undefined && props && props.id !== undefined) {
+            rawKey = props.id;
+        }
+        if (isSignal(rawKey)) {
+            rawKey = rawKey.value;
+        } else if (typeof rawKey === "function" && !rawKey.name && rawKey.kind === undefined) {
+            rawKey = rawKey();
+        }
+
+        const cacheKey = rawKey !== undefined && rawKey !== null
+            ? `${compFn.name || "Component"}:${rawKey}`
+            : compFn;
+
+        if (compFn === activeCompFn && cacheKey === activeCacheKey) {
             return;
         }
 
-        cleanupActiveComp();
+        if (keepCache && keepCache.has(cacheKey)) {
+            const cached = keepCache.get(cacheKey);
+            detachActiveComp();
+
+            activeCompFn = compFn;
+            activeCompCtx = cached.compCtx;
+            activeCacheKey = cacheKey;
+
+            const parent = startAnchor.parentNode;
+            if (parent && cached.fragment) {
+                parent.insertBefore(cached.fragment, endAnchor);
+                cached.fragment = null;
+            }
+
+            reactivateContext(activeCompCtx);
+            return;
+        }
+
+        detachActiveComp();
 
         activeCompFn = compFn;
+        activeCacheKey = cacheKey;
         activeCompCtx = new ComponentContext(compFn.name || "MountedComponent");
         if (ctx) {
             activeCompCtx.parent = ctx;
@@ -105,7 +170,7 @@ export function Load(props) {
         const forwardedProps = {};
         if (props) {
             for (const key of Object.keys(props)) {
-                if (key !== "component" && key !== "__templateValues" && key !== "__capitalTags") {
+                if (key !== "component" && key !== "key" && key !== "Key" && key !== "__templateValues" && key !== "__capitalTags") {
                     forwardedProps[key] = props[key];
                 }
             }
@@ -133,7 +198,7 @@ export function Load(props) {
     if (ctx) {
         ctx.addEffect(() => {
             disposer();
-            cleanupActiveComp();
+            detachActiveComp();
         });
     }
 
@@ -212,4 +277,3 @@ export function unmount(target) {
     }
     targetEl.innerHTML = "";
 }
-

@@ -2,8 +2,15 @@
  * PrimalJS Component Registry
  */
 
-import { Load } from "./mount.js";
-import { Boundary } from "./boundary.js";
+import { Load } from "./load.js";
+import { Guard, Boundary } from "./guard.js";
+import { Place } from "./place.js";
+import { WithinView } from "./within-view.js";
+import { Animate } from "./animate.js";
+import { Wait, Delay, Briefly, Failed } from "./async.js";
+import { Keep } from "./keep.js";
+import { OnIdle } from "./on-idle.js";
+import { Focus } from "./focus.js";
 
 const registry = new Map();
 
@@ -51,7 +58,7 @@ export function clearRegistry() {
 
 
 function registerDefaultComponents() {
-    register(Load, Boundary);
+    register(Load, Guard, Boundary, Place, WithinView, Animate, Wait, Delay, Briefly, Failed, Keep, OnIdle, Focus);
 }
 
 registerDefaultComponents();

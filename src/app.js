@@ -2,7 +2,7 @@
  * PrimalJS createApp Application Factory & Global Error Boundary Dispatcher
  */
 
-import { mount, unmount } from "./mount.js";
+import { mount, unmount } from "./load.js";
 import { activate } from "./activate.js";
 import { setupPwa } from "./pwa.js";
 import { setDevMode, PrimalJSError } from "./diagnostics.js";
@@ -13,8 +13,8 @@ const activeAppHandlers = [];
 
 /**
  * @typedef {Object} AppConfig
- * @property {import("./mount.js").Component} [root] Root application component function.
- * @property {import("./mount.js").Component} [app] Alias for `root`.
+ * @property {import("./load.js").Component} [root] Root application component function.
+ * @property {import("./load.js").Component} [app] Alias for `root`.
  * @property {import("./router.js").Router} [router] Optional PrimalJS Router instance.
  * @property {import("./pwa.js").PwaOptions} [pwa] Optional PWA configuration.
  * @property {boolean} [dev] Enable dev diagnostics mode.
@@ -23,8 +23,8 @@ const activeAppHandlers = [];
 
 /**
  * @typedef {Object} AppInstance
- * @property {(target: string | Element) => import("./mount.js").AppHandle | undefined} mount Mounts application to target element.
- * @property {(target: string | Element, initialState?: any) => import("./mount.js").AppHandle | undefined} activate Activates/hydrates application on target element.
+ * @property {(target: string | Element) => import("./load.js").AppHandle | undefined} mount Mounts application to target element.
+ * @property {(target: string | Element, initialState?: any) => import("./load.js").AppHandle | undefined} activate Activates/hydrates application on target element.
  * @property {() => void} dispose Disposes application resources.
  */
 

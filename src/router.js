@@ -5,7 +5,7 @@
 
 import { signal, computed, batch } from "./signal.js";
 import { html } from "./html.js";
-import { Load } from "./mount.js";
+import { Load } from "./load.js";
 import { head } from "./seo.js";
 import { getCurrentContext, pushContext, popContext } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";

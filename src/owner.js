@@ -24,12 +24,18 @@ export class Owner {
         this.destroyHooks = [];
         /** @type {(() => void)[]} */
         this.mountHooks = [];
+        /** @type {(() => void)[]} */
+        this.deactivateHooks = [];
+        /** @type {(() => void)[]} */
+        this.reactivateHooks = [];
         /** @type {any} */
         this.tryBoundary = null;
         /** @type {boolean} */
         this.isDestroyed = false;
         /** @type {boolean} */
         this.isMounted = false;
+        /** @type {boolean} */
+        this.isKept = false;
     }
 
     /**
@@ -66,11 +72,34 @@ export class Owner {
     }
 
     /**
+     * Adds a deactivate hook callback (called when component is kept/detached).
+     *
+     * @param {() => void} hook
+     */
+    addDeactivateHook(hook) {
+        if (typeof hook === "function") {
+            this.deactivateHooks.push(hook);
+        }
+    }
+
+    /**
+     * Adds a reactivate hook callback (called when kept component is restored/attached).
+     *
+     * @param {() => void} hook
+     */
+    addReactivateHook(hook) {
+        if (typeof hook === "function") {
+            this.reactivateHooks.push(hook);
+        }
+    }
+
+    /**
      * Disposes this owner, invoking destroy hooks, effect disposers, and disposing child owners recursively.
      */
     dispose() {
         if (this.isDestroyed) return;
         this.isDestroyed = true;
+        this.isKept = false;
 
         if (this.parent && Array.isArray(this.parent.children)) {
             const idx = this.parent.children.indexOf(this);
@@ -102,6 +131,7 @@ export class Owner {
         }
         this.effects = [];
         this.mountHooks = [];
+        this.deactivateHooks = [];
+        this.reactivateHooks = [];
     }
 }
-

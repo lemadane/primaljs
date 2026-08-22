@@ -15,6 +15,7 @@ import {
     Delay,
     Briefly,
     Failed,
+    Guard,
     Boundary
 } from "../../primal.js";
 
@@ -200,7 +201,7 @@ const router = createRouter({
 
 // --- Component Registration ---
 
-register(HeaderNav, MainLayout, DashboardPage, UsersPage, AsyncPage, RouteOutlet, Wait, Delay, Briefly, Failed, Boundary);
+register(HeaderNav, MainLayout, DashboardPage, UsersPage, AsyncPage, RouteOutlet, Wait, Delay, Briefly, Failed, Guard, Boundary);
 
 // --- App Initialization ---
 

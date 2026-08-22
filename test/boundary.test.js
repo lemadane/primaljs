@@ -1,9 +1,9 @@
 import "./setup.js";
 import { describe, it, beforeEach } from "node:test";
 import assert from "node:assert/strict";
-import { html, signal, mount, clearRegistry, register, Boundary, onMount } from "../src/index.js";
+import { html, signal, mount, clearRegistry, register, Guard, Boundary, onMount } from "../src/index.js";
 
-describe("PrimalJS <Boundary> Local Error Handling Suite", () => {
+describe("PrimalJS <Guard> Local Error Handling Suite", () => {
     let container;
 
     beforeEach(() => {
@@ -28,9 +28,9 @@ describe("PrimalJS <Boundary> Local Error Handling Suite", () => {
 
         function App() {
             return html`
-                <Boundary fallback=${(err) => html`<div class="fallback">Caught: ${err.message}</div>`}>
+                <Guard fallback=${(err) => html`<div class="fallback">Caught: ${err.message}</div>`}>
                     <FaultyChild />
-                </Boundary>
+                </Guard>
             `;
         }
 
