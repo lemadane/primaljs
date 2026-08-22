@@ -32,6 +32,7 @@ const modules = [
     "router.js",
     "html.js",
     "boundary.js",
+    "async.js",
     "index.js"
 ];
 
@@ -46,9 +47,12 @@ for (const modFile of modules) {
     // Remove internal ES module import statements
     content = content.replace(/^import\s+[\s\S]*?from\s+["']\..*?["'];?\s*$/gm, "");
 
-    // Remove internal export keywords inside bundled code except for final index.js exports
-    if (modFile !== "index.js") {
-        content = content.replace(/^export\s+(class|function|const|let|var)\s+/gm, "$1 ");
+    if (modFile === "index.js") {
+        // Strip relative 'from "./..."' clauses so re-exports reference top-level concatenated declarations
+        content = content.replace(/\s+from\s+["']\..*?["']/g, "");
+    } else {
+        // Remove internal export keywords (handling async functions, functions, classes, vars)
+        content = content.replace(/^export\s+(async\s+)?(class|function|const|let|var)\s+/gm, "$1$2 ");
         content = content.replace(/^export\s+\{[\s\S]*?\};?\s*$/gm, "");
     }
 

@@ -13,7 +13,7 @@ import {
 } from "./lifecycle.js";
 import { convertToDOMNode } from "./html.js";
 
-function clearAnchorRange(startAnchor, endAnchor) {
+export function clearAnchorRange(startAnchor, endAnchor) {
     const parent = startAnchor.parentNode;
     if (!parent) return;
 
@@ -25,7 +25,7 @@ function clearAnchorRange(startAnchor, endAnchor) {
     }
 }
 
-function insertAfterAnchor(startAnchor, domNode) {
+export function insertAfterAnchor(startAnchor, domNode) {
     const parent = startAnchor.parentNode;
     if (!parent || !domNode) return;
     parent.insertBefore(domNode, startAnchor.nextSibling);

@@ -37,6 +37,10 @@ export {
     unregisterServiceWorkers,
     createApp,
     Boundary,
+    Wait,
+    Delay,
+    Briefly,
+    Failed,
     PrimalJSError,
     setDevMode
 } from "./src/index.js";

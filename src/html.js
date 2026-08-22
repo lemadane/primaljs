@@ -14,6 +14,7 @@ import {
     destroyContext
 } from "./lifecycle.js";
 import { reportGlobalError } from "./app.js";
+import { clearAnchorRange, insertAfterAnchor } from "./mount.js";
 
 const templateCache = new WeakMap();
 
@@ -87,39 +88,64 @@ function findCapitalTagNames(htmlStr) {
 function compileTemplate(strings) {
     let rawHtml = "";
     const bindingSpecs = [];
-    let mutableStrings = Array.from(strings);
+    let currentAttr = null;
 
-    for (let i = 0; i < mutableStrings.length; i++) {
-        rawHtml += mutableStrings[i];
-        if (i < mutableStrings.length - 1) {
+    const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+    for (let i = 0; i < strings.length - 1; i++) {
+        const str = strings[i];
+
+        if (currentAttr) {
+            currentAttr.parts.push({ static: str });
+            currentAttr.parts.push({ valueIndex: i });
+
+            const quote = currentAttr.quote;
+            const nextStr = strings[i + 1] || "";
+            if (quote && nextStr.includes(quote)) {
+                const quoteIdx = nextStr.indexOf(quote);
+                const suffix = nextStr.slice(0, quoteIdx);
+                currentAttr.parts.push({ static: suffix });
+                bindingSpecs.push(currentAttr);
+                currentAttr = null;
+            } else if (!quote) {
+                currentAttr.parts.push({ static: "" });
+                bindingSpecs.push(currentAttr);
+                currentAttr = null;
+            }
+        } else {
+            rawHtml += str;
             const matchAttr = rawHtml.match(/([a-zA-Z0-9_-]+)\s*=\s*(["']?)([^"'>]*)$/);
+
             if (matchAttr) {
                 const attrName = matchAttr[1];
                 const quote = matchAttr[2];
                 const prefix = matchAttr[3] || "";
-                let suffix = "";
-
-                if (quote && mutableStrings[i + 1]) {
-                    const suffixMatch = mutableStrings[i + 1].match(new RegExp(`^(.*?)${quote}`));
-                    if (suffixMatch) {
-                        suffix = suffixMatch[1];
-                        mutableStrings[i + 1] = mutableStrings[i + 1].slice(suffix.length + quote.length);
-                    }
-                }
 
                 const markerAttr = `primal-attr-${i}`;
-                const escapeRegExp = (str) => str.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-                const replacePattern = new RegExp(`${escapeRegExp(attrName)}\\s*=\\s*${quote ? quote : ''}${escapeRegExp(prefix)}$`);
+                const replacePattern = new RegExp(`${escapeRegExp(attrName)}\\s*=\\s*${quote ? escapeRegExp(quote) : ''}${escapeRegExp(prefix)}$`);
                 rawHtml = rawHtml.replace(replacePattern, `${markerAttr}="${attrName}" `);
 
-                bindingSpecs.push({
+                currentAttr = {
                     type: "attribute",
                     valueIndex: i,
                     attrName: attrName,
                     markerAttr: markerAttr,
-                    prefix: prefix,
-                    suffix: suffix
-                });
+                    quote: quote,
+                    parts: [{ static: prefix }, { valueIndex: i }]
+                };
+
+                const nextStr = strings[i + 1] || "";
+                if (quote && nextStr.includes(quote)) {
+                    const quoteIdx = nextStr.indexOf(quote);
+                    const suffix = nextStr.slice(0, quoteIdx);
+                    currentAttr.parts.push({ static: suffix });
+                    bindingSpecs.push(currentAttr);
+                    currentAttr = null;
+                } else if (!quote) {
+                    currentAttr.parts.push({ static: "" });
+                    bindingSpecs.push(currentAttr);
+                    currentAttr = null;
+                }
             } else {
                 const markerComment = `<!--primal-ph-${i}-->`;
                 rawHtml += markerComment;
@@ -130,6 +156,18 @@ function compileTemplate(strings) {
                 });
             }
         }
+    }
+
+    if (strings.length > 0) {
+        let lastStr = strings[strings.length - 1];
+        if (bindingSpecs.length > 0) {
+            const lastSpec = bindingSpecs[bindingSpecs.length - 1];
+            if (lastSpec.type === "attribute" && lastSpec.quote && lastStr.includes(lastSpec.quote)) {
+                const qIdx = lastStr.indexOf(lastSpec.quote);
+                lastStr = lastStr.slice(qIdx + lastSpec.quote.length);
+            }
+        }
+        rawHtml += lastStr;
     }
 
     const capitalTags = findCapitalTagNames(rawHtml);
@@ -164,21 +202,22 @@ function compileTemplate(strings) {
                     path: [...path]
                 });
             } else {
+                const attrList = Array.from(node.attributes);
                 const attrsToRemove = [];
-                for (let j = 0; j < node.attributes.length; j++) {
-                    const attr = node.attributes[j];
+                for (const attr of attrList) {
                     if (attr.name.startsWith("primal-attr-")) {
                         const index = parseInt(attr.name.replace("primal-attr-", ""), 10);
                         const targetAttrName = attr.value;
-                        const spec = bindingSpecs.find(s => s.valueIndex === index);
+                        const spec = bindingSpecs.find(s => s.valueIndex === index || s.markerAttr === attr.name);
                         instructions.push({
                             type: targetAttrName.toLowerCase().startsWith("on")
                                 ? "event"
                                 : "attribute",
                             attrName: targetAttrName,
                             valueIndex: index,
-                            prefix: spec ? spec.prefix : "",
-                            suffix: spec ? spec.suffix : "",
+                            parts: spec ? spec.parts : null,
+                            prefix: spec ? (spec.prefix || "") : "",
+                            suffix: spec ? (spec.suffix || "") : "",
                             path: [...path]
                         });
                         attrsToRemove.push(attr.name);
@@ -207,10 +246,14 @@ function compileTemplate(strings) {
         childIdx++;
     }
 
+    const firstElem = Array.from(templateEl.content.childNodes).find(n => n.nodeType === 1);
+    const rootNodeName = firstElem ? firstElem.nodeName : null;
+
     return {
         fragment: templateEl.content.cloneNode(true),
         instructions: instructions,
-        capitalTags: capitalTags
+        capitalTags: capitalTags,
+        rootNodeName: rootNodeName
     };
 }
 
@@ -257,7 +300,7 @@ export function renderTemplate(templateResult, parentCtx = getCurrentContext()) 
         } else if (spec.type === "event") {
             bindEvent(targetNode, spec.attrName, val, parentCtx);
         } else if (spec.type === "attribute") {
-            bindAttribute(targetNode, spec.attrName, val, parentCtx, spec.prefix, spec.suffix);
+            bindAttribute(targetNode, spec.attrName, val, parentCtx, spec.prefix, spec.suffix, spec.parts, templateResult.values);
         } else if (spec.type === "component") {
             instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, parentCtx, cached.capitalTags);
         }
@@ -282,7 +325,7 @@ function findCommentMarker(root, valueIndex) {
     return null;
 }
 
-export function activateTemplate(existingDOMNode, templateResult, ctx = getCurrentContext()) {
+export function activateTemplate(existingDOMNode, templateResult, ctx = getCurrentContext(), isRootNode = false) {
     if (!existingDOMNode || !templateResult || !(templateResult instanceof TemplateResult)) {
         return;
     }
@@ -293,7 +336,12 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
         templateCache.set(templateResult.strings, cached);
     }
 
-    const targetNodes = cached.instructions.map(spec => getNodeByPath(existingDOMNode, spec.path));
+    const targetNodes = cached.instructions.map(spec => {
+        if (isRootNode && spec.path.length > 0 && spec.path[0] === 0) {
+            return getNodeByPath(existingDOMNode, spec.path.slice(1));
+        }
+        return getNodeByPath(existingDOMNode, spec.path);
+    });
 
     for (let i = 0; i < cached.instructions.length; i++) {
         const spec = cached.instructions[i];
@@ -328,7 +376,7 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
         } else if (spec.type === "event" || (spec.type === "attribute" && spec.attrName.toLowerCase().startsWith("on"))) {
             bindEvent(targetNode, spec.attrName, val, ctx);
         } else if (spec.type === "attribute") {
-            bindAttribute(targetNode, spec.attrName, val, ctx, spec.prefix, spec.suffix);
+            bindAttribute(targetNode, spec.attrName, val, ctx, spec.prefix, spec.suffix, spec.parts, templateResult.values);
         } else if (spec.type === "component") {
             instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, ctx, cached.capitalTags);
         }
@@ -388,7 +436,7 @@ function reconcileList(startAnchor, endAnchor, newItems, oldItemMap, parentCtx) 
         if (record) {
             oldItemMap.delete(key);
             if (itemVal instanceof TemplateResult && record.domNode) {
-                activateTemplate(record.domNode, itemVal, record.itemCtx);
+                activateTemplate(record.domNode, itemVal, record.itemCtx, true);
             }
         } else {
             const itemCtx = new ComponentContext("ListItem");
@@ -620,75 +668,150 @@ function bindEvent(targetElement, attrName, handler, ctx) {
     if (typeof handler !== "function") return;
     const eventName = attrName.startsWith("on") ? attrName.slice(2).toLowerCase() : attrName.toLowerCase();
 
-    const wrappedHandler = (event) => {
-        try {
-            handler(event);
-        } catch (err) {
-            reportGlobalError(err, { type: "event_handler", event: eventName, component: ctx ? ctx.name : null });
+    if (!targetElement._primalHandlers) {
+        targetElement._primalHandlers = {};
+    }
+
+    targetElement._primalHandlers[eventName] = handler;
+
+    if (!targetElement._primalListeners) {
+        targetElement._primalListeners = new Set();
+    }
+
+    if (!targetElement._primalListeners.has(eventName)) {
+        targetElement._primalListeners.add(eventName);
+        const dispatcher = (event) => {
+            const currentHandler = targetElement._primalHandlers ? targetElement._primalHandlers[eventName] : null;
+            if (typeof currentHandler === "function") {
+                try {
+                    currentHandler(event);
+                } catch (err) {
+                    reportGlobalError(err, { type: "event_handler", event: eventName, component: ctx ? ctx.name : null, ctx: ctx });
+                }
+            }
+        };
+
+        targetElement.addEventListener(eventName, dispatcher);
+
+        if (ctx) {
+            ctx.addDestroyHook(() => {
+                targetElement.removeEventListener(eventName, dispatcher);
+                if (targetElement._primalListeners) {
+                    targetElement._primalListeners.delete(eventName);
+                }
+                if (targetElement._primalHandlers) {
+                    delete targetElement._primalHandlers[eventName];
+                }
+            });
         }
-    };
-
-    targetElement.addEventListener(eventName, wrappedHandler);
-
-    if (ctx) {
-        ctx.addDestroyHook(() => {
-            targetElement.removeEventListener(eventName, wrappedHandler);
-        });
     }
 }
 
-function bindAttribute(targetElement, attrName, value, ctx, prefix = "", suffix = "") {
-    if (attrName.startsWith("on") && (typeof value === "function" || isSignal(value))) {
-        bindEvent(targetElement, attrName, value, ctx);
-        return;
+function bindAttribute(targetElement, attrName, value, ctx, prefix = "", suffix = "", parts = null, templateValues = null) {
+    if (attrName.startsWith("on")) {
+        const handler = (parts && templateValues && parts[1]) ? templateValues[parts[1].valueIndex] : value;
+        if (typeof handler === "function" || isSignal(handler)) {
+            bindEvent(targetElement, attrName, handler, ctx);
+            return;
+        }
     }
     if (attrName === "ref") {
-        if (isRef(value)) {
-            value.current = targetElement;
+        const refVal = (parts && templateValues && parts[1]) ? templateValues[parts[1].valueIndex] : value;
+        if (isRef(refVal)) {
+            refVal.current = targetElement;
             if (ctx) {
                 ctx.addDestroyHook(() => {
-                    if (value.current === targetElement) {
-                        value.current = null;
+                    if (refVal.current === targetElement) {
+                        refVal.current = null;
                     }
                 });
             }
-        } else if (typeof value === "function") {
-            value(targetElement);
+        } else if (typeof refVal === "function") {
+            refVal(targetElement);
             if (ctx) {
                 ctx.addDestroyHook(() => {
-                    value(null);
+                    refVal(null);
                 });
             }
         }
         return;
     }
 
-    if (attrName === "style" && typeof value === "object" && value !== null && !isSignal(value)) {
-        bindStyleObject(targetElement, value, ctx);
-        return;
+    if (attrName === "style" && parts && parts.length === 3 && parts[0].static === "" && parts[2].static === "") {
+        const styleVal = templateValues ? templateValues[parts[1].valueIndex] : value;
+        if (typeof styleVal === "object" && styleVal !== null && !isSignal(styleVal)) {
+            bindStyleObject(targetElement, styleVal, ctx);
+            return;
+        }
     }
 
-    const computeVal = (v) => {
-        let raw = v;
-        if (typeof v === "function") {
-            raw = v();
-        } else if (isSignal(v)) {
-            raw = v.value;
+    const computeVal = () => {
+        if (!parts || parts.length === 0) {
+            let raw = value;
+            if (typeof value === "function") raw = value();
+            else if (isSignal(value)) raw = value.value;
+            if (raw === null || raw === undefined || raw === false) {
+                if (!prefix && !suffix) return raw;
+                raw = "";
+            }
+            return (prefix || suffix) ? `${prefix}${raw}${suffix}` : raw;
         }
-        if (raw === null || raw === undefined || raw === false) {
-            if (!prefix && !suffix) return raw;
-            raw = "";
+
+        if (parts.length === 3 && parts[0].static === "" && parts[2].static === "") {
+            const v = templateValues ? templateValues[parts[1].valueIndex] : value;
+            let raw = v;
+            if (typeof v === "function") raw = v();
+            else if (isSignal(v)) raw = v.value;
+            return raw;
         }
-        return (prefix || suffix) ? `${prefix}${raw}${suffix}` : raw;
+
+        let result = "";
+        let isPureNull = false;
+
+        for (const part of parts) {
+            if (part.static !== undefined) {
+                result += part.static;
+            } else if (part.valueIndex !== undefined) {
+                const v = templateValues[part.valueIndex];
+                let raw = v;
+                if (typeof v === "function") {
+                    raw = v();
+                } else if (isSignal(v)) {
+                    raw = v.value;
+                }
+                if (raw === null || raw === undefined || raw === false) {
+                    raw = "";
+                }
+                result += raw;
+            }
+        }
+        return result;
     };
 
-    if (typeof value === "function" || isSignal(value)) {
+    const hasReactiveParts = parts ? parts.some(p => {
+        if (p.valueIndex === undefined) return false;
+        const v = templateValues[p.valueIndex];
+        return typeof v === "function" || isSignal(v);
+    }) : (typeof value === "function" || isSignal(value));
+
+    if (hasReactiveParts) {
+        if (!targetElement._primalAttrDisposers) {
+            targetElement._primalAttrDisposers = {};
+        }
+        if (targetElement._primalAttrDisposers[attrName]) {
+            targetElement._primalAttrDisposers[attrName]();
+        }
         const disposer = effect(() => {
-            setElementAttribute(targetElement, attrName, computeVal(value));
+            setElementAttribute(targetElement, attrName, computeVal());
         });
+        targetElement._primalAttrDisposers[attrName] = disposer;
         if (ctx) ctx.addEffect(disposer);
     } else {
-        setElementAttribute(targetElement, attrName, computeVal(value));
+        if (targetElement._primalAttrDisposers && targetElement._primalAttrDisposers[attrName]) {
+            targetElement._primalAttrDisposers[attrName]();
+            delete targetElement._primalAttrDisposers[attrName];
+        }
+        setElementAttribute(targetElement, attrName, computeVal());
     }
 }
 
@@ -821,7 +944,13 @@ function instantiateComponentNode(placeholderEl, componentFn, templateValues, pa
         props.__capitalTags = capitalTags;
         props.__templateValues = templateValues;
 
-        compResult = componentFn(props);
+        try {
+            compResult = componentFn(props);
+        } catch (err) {
+            const handled = reportGlobalError(err, { type: "component_render", component: componentFn.name, ctx: compCtx });
+            if (!handled) throw err;
+            compResult = null;
+        }
     } finally {
         popContext();
     }
@@ -876,24 +1005,6 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
             }
         }
     }
-}
-
-export function clearAnchorRange(startAnchor, endAnchor) {
-    const parent = startAnchor.parentNode;
-    if (!parent) return;
-
-    let current = startAnchor.nextSibling;
-    while (current && current !== endAnchor) {
-        const next = current.nextSibling;
-        parent.removeChild(current);
-        current = next;
-    }
-}
-
-export function insertAfterAnchor(startAnchor, domNode) {
-    const parent = startAnchor.parentNode;
-    if (!parent || !domNode) return;
-    parent.insertBefore(domNode, startAnchor.nextSibling);
 }
 
 export function convertToDOMNode(val, ctx) {

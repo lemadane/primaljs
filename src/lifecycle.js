@@ -99,7 +99,7 @@ export function triggerMount(ctx) {
         try {
             hook();
         } catch (err) {
-            reportGlobalError(err, { type: "onMount", component: ctx.name });
+            reportGlobalError(err, { type: "onMount", component: ctx.name, ctx: ctx });
         }
     };
     ctx.mountHooks = [];

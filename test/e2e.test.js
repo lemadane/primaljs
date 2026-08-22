@@ -71,18 +71,36 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await context.close();
     });
 
-    it("runs reactive todo app (examples/todo) with state updates & list items", async () => {
+    it("runs reactive todo app (examples/todo) with keyed reconciliation, event handling & item removal", async () => {
         const context = await browser.newContext();
         const page = await context.newPage();
         await page.goto(`http://localhost:${port}/examples/todo/index.html`, { waitUntil: "domcontentloaded" });
-        const initialCount = await page.locator(".todo-item").count();
-        await page.type(".input-text", "Write E2E Browser Test");
+
+        const initialCount = await page.locator("li.todo-item").count();
+        assert.equal(initialCount, 3);
+
+        // Add a new todo item
+        await page.fill(".input-text", "Write E2E Browser Test");
         await page.click("button[type='submit']");
-        assert.equal(await page.locator(".todo-item").count(), initialCount + 1);
+
+        // Verify count updated
+        assert.equal(await page.locator("li.todo-item").count(), 4);
+
+        // Toggle checkbox on the 4th item
+        const lastItemCheckbox = page.locator("li.todo-item").nth(3).locator("input[type='checkbox']");
+        await lastItemCheckbox.click();
+        await page.waitForTimeout(100);
+
+        // Verify completion styling applied
+        const lastItemClass = await page.locator("li.todo-item").nth(3).getAttribute("class");
+        assert.ok(lastItemClass.includes("completed"));
+
+        // Delete the 4th item
+        await page.click("li.todo-item:last-child .del-btn");
+        assert.equal(await page.locator("li.todo-item").count(), 3);
+
         await context.close();
     });
-
-
 
     it("runs dynamic render app (examples/render) testing <Load> component switching", async () => {
         const context = await browser.newContext();
@@ -90,6 +108,45 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
         await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });
         const profileHeader = (await page.locator(".profile-view h3").textContent()).trim();
         assert.equal(profileHeader, "Profile Component");
+        await context.close();
+    });
+
+    it("runs full SPA showcase app (examples/showcase) testing router navigation, signals, SEO head & <Wait> async resources", async () => {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+
+        await page.goto(`http://localhost:${port}/examples/showcase/index.html`, { waitUntil: "domcontentloaded" });
+
+        // 1. Dashboard Page Verification
+        await page.waitForSelector(".counter-val");
+        assert.equal(await page.title(), "Dashboard | PrimalJS Showcase");
+        assert.equal((await page.locator(".counter-val").textContent()).trim(), "0");
+
+        await page.click(".btn-inc");
+        assert.equal((await page.locator(".counter-val").textContent()).trim(), "1");
+
+        await page.fill(".input-field", "PrimalJS E2E Test");
+        assert.equal((await page.locator(".bound-text").textContent()).trim(), "PrimalJS E2E Test");
+
+        // 2. SPA Navigation to /users
+        await page.click("a[href='/users']");
+        await page.waitForSelector(".search-input");
+        assert.equal(await page.title(), "Users | PrimalJS Showcase");
+
+        await page.fill(".search-input", "Lemuel");
+        const userRows = await page.locator(".user-row").count();
+        assert.equal(userRows, 1);
+
+        // 3. SPA Navigation to /async testing <Wait> and <Briefly>
+        await page.click("a[href='/async']");
+        await page.waitForTimeout(20);
+        assert.equal(await page.title(), "Async Loader | PrimalJS Showcase");
+
+        // Verify <Wait> resolved state
+        await page.waitForSelector(".async-result", { timeout: 2000 });
+        const asyncText = await page.locator(".async-result h3").textContent();
+        assert.ok(asyncText.includes("Data Resolved Successfully"));
+
         await context.close();
     });
 });

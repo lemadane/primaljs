@@ -8,8 +8,14 @@ import {
     createApp,
     createRouter,
     RouteOutlet,
+    navigate,
     head,
-    onMount
+    onMount,
+    Wait,
+    Delay,
+    Briefly,
+    Failed,
+    Boundary
 } from "../../primal.js";
 
 // --- Global Reactive State ---
@@ -50,9 +56,9 @@ function HeaderNav() {
                 </div>
                 <nav>
                     <ul>
-                        <li><a href="/">Dashboard</a></li>
-                        <li><a href="/users">Users List (${() => filteredUsers.value.length})</a></li>
-                        <li><a href="/async">Async Loader</a></li>
+                        <li><a href="/" onclick=${(e) => { console.log("CLICKED /"); e.preventDefault(); navigate("/"); }}>Dashboard</a></li>
+                        <li><a href="/users" onclick=${(e) => { console.log("CLICKED /users"); e.preventDefault(); navigate("/users"); }}>Users List (${() => filteredUsers.value.length})</a></li>
+                        <li><a href="/async" onclick=${(e) => { console.log("CLICKED /async"); e.preventDefault(); navigate("/async"); }}>Async Loader</a></li>
                     </ul>
                 </nav>
             </div>
@@ -95,9 +101,9 @@ function DashboardPage() {
             <div class="grid-2">
                 <div class="card">
                     <h3>Signal Reactivity</h3>
-                    <p style="margin: 1rem 0;">Counter Value: <strong>${counter}</strong></p>
+                    <p style="margin: 1rem 0;">Counter Value: <strong class="counter-val">${counter}</strong></p>
                     <div style="display: flex; gap: 0.5rem;">
-                        <button class="btn" onclick=${() => counter.value++}>Increment</button>
+                        <button class="btn btn-inc" onclick=${() => counter.value++}>Increment</button>
                         <button class="btn btn-secondary" onclick=${() => counter.value = 0}>Reset</button>
                     </div>
                 </div>
@@ -105,7 +111,7 @@ function DashboardPage() {
                 <div class="card">
                     <h3>Direct Input Binding & Ref</h3>
                     <input ref=${inputRef} class="input-field" value=${textInput} oninput=${(e) => textInput.value = e.target.value} placeholder="Type something..." />
-                    <p style="margin-top: 0.75rem;">Bound Text: <em>${textInput}</em></p>
+                    <p style="margin-top: 0.75rem;">Bound Text: <em class="bound-text">${textInput}</em></p>
                     <button class="btn btn-secondary" style="margin-top: 0.75rem;" onclick=${handleFocus}>Focus Input via Ref</button>
                 </div>
             </div>
@@ -121,9 +127,9 @@ function UsersPage() {
             <h2>User Search & List</h2>
             <div class="card" style="margin-top: 1rem;">
                 <div style="display: flex; gap: 1rem; margin-bottom: 1rem; align-items: center;">
-                    <input class="input-field" placeholder="Search users by name or role..." oninput=${(e) => searchQuery.value = e.target.value} style="margin-top:0;" />
-                    <button class="btn btn-secondary" onclick=${() => activeTab.value = "all"}>All</button>
-                    <button class="btn btn-secondary" onclick=${() => activeTab.value = "active"}>Active</button>
+                    <input class="input-field search-input" placeholder="Search users by name or role..." oninput=${(e) => searchQuery.value = e.target.value} style="margin-top:0;" />
+                    <button class="btn btn-secondary btn-all" onclick=${() => activeTab.value = "all"}>All</button>
+                    <button class="btn btn-secondary btn-active-tab" onclick=${() => activeTab.value = "active"}>Active</button>
                 </div>
 
                 <div class="user-list">
@@ -145,36 +151,32 @@ function UsersPage() {
 function AsyncPage() {
     head({ title: "Async Loader | PrimalJS Showcase" });
 
-    const dataSignal = signal(null);
-    const loadingSignal = signal(true);
-
-    onMount(() => {
-        setTimeout(() => {
-            dataSignal.value = { title: "PrimalJS Async Capability", timestamp: new Date().toLocaleTimeString() };
-            loadingSignal.value = false;
-        }, 300);
-    });
+    const promiseSignal = signal(new Promise(resolve => setTimeout(() => resolve({ title: "PrimalJS Async Capability", timestamp: "10:00 AM" }), 150)));
 
     return html`
         <div>
-            <h2>Async State Loading</h2>
+            <h2>Declarative Async Resource Loader</h2>
             <p style="color: var(--text-secondary); margin-bottom: 1rem;">
-                Async data loading with Signals without parent component re-renders.
+                Async data loading with &lt;Wait&gt;, &lt;Briefly&gt;, and &lt;Failed&gt; primitives.
             </p>
 
             <div class="card">
-                ${() => loadingSignal.value ? html`
-                    <div style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-secondary);">
-                        <div class="loading-spinner"></div>
-                        <span>Fetching mock async data from server...</span>
-                    </div>
-                ` : html`
-                    <div style="color: var(--accent-emerald);">
-                        <h3>✓ Data Resolved Successfully</h3>
-                        <p><strong>Title:</strong> ${dataSignal.value?.title}</p>
-                        <p><strong>Time:</strong> ${dataSignal.value?.timestamp}</p>
-                    </div>
-                `}
+                <Wait for=${promiseSignal}>
+                    ${data => html`
+                        <div class="async-result" style="color: var(--accent-emerald);">
+                            <h3>✓ Data Resolved Successfully</h3>
+                            <p><strong>Title:</strong> ${data.title}</p>
+                            <p><strong>Time:</strong> ${data.timestamp}</p>
+                        </div>
+                    `}
+
+                    <Briefly>
+                        <div class="loading-spinner-box" style="display: flex; align-items: center; gap: 0.75rem; color: var(--text-secondary);">
+                            <div class="loading-spinner"></div>
+                            <span>Fetching mock async data...</span>
+                        </div>
+                    </Briefly>
+                </Wait>
             </div>
         </div>
     `;
@@ -188,9 +190,9 @@ const router = createRouter({
             path: "/",
             component: MainLayout,
             children: [
-                { path: "", component: DashboardPage },
-                { path: "users", component: UsersPage },
-                { path: "async", component: AsyncPage }
+                { path: "", component: DashboardPage, meta: { title: "Dashboard | PrimalJS Showcase" } },
+                { path: "users", component: UsersPage, meta: { title: "Users | PrimalJS Showcase" } },
+                { path: "async", component: AsyncPage, meta: { title: "Async Loader | PrimalJS Showcase" } }
             ]
         }
     ]
@@ -198,7 +200,7 @@ const router = createRouter({
 
 // --- Component Registration ---
 
-register(HeaderNav, MainLayout, DashboardPage, UsersPage, AsyncPage, RouteOutlet);
+register(HeaderNav, MainLayout, DashboardPage, UsersPage, AsyncPage, RouteOutlet, Wait, Delay, Briefly, Failed, Boundary);
 
 // --- App Initialization ---
 
@@ -211,3 +213,7 @@ const app = createApp({
 });
 
 app.mount("#app");
+
+if (typeof window !== "undefined" && window.location.pathname.includes("examples/showcase")) {
+    navigate("/");
+}

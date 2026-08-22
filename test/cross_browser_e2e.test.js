@@ -115,10 +115,19 @@ describe("PrimalJS Cross-Browser E2E Engine Suite (Chromium, Firefox, Safari/Web
 
 
 
-                // 8. Dynamic Component Switcher Example (<Load>) (examples/render)
+                // 3. Dynamic Component Switcher Example (<Load>) (examples/render)
                 await page.goto(`http://localhost:${port}/examples/render/index.html`, { waitUntil: "domcontentloaded" });
                 const profileHeader = (await page.locator(".profile-view h3").textContent()).trim();
                 assert.equal(profileHeader, "Profile Component");
+
+                // 4. SPA Showcase App (examples/showcase) testing Router, Signals, SEO & <Wait>
+                await page.goto(`http://localhost:${port}/examples/showcase/index.html`, { waitUntil: "domcontentloaded" });
+                assert.equal(await page.title(), "Dashboard | PrimalJS Showcase");
+                await page.click("a[href='/async']");
+                await page.waitForTimeout(20);
+                assert.equal(await page.title(), "Async Loader | PrimalJS Showcase");
+                await page.waitForSelector(".async-result", { timeout: 2000 });
+                assert.ok((await page.locator(".async-result h3").textContent()).includes("Data Resolved Successfully"));
 
                 await context.close();
             } finally {

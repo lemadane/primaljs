@@ -337,7 +337,7 @@ export class ReactiveEffect {
                 this.tryBoundary.handleError(err);
                 return;
             }
-            const effectCtx = this.ctx || (this.owner instanceof ComponentContext ? this.owner : null) || getCurrentContext();
+            const effectCtx = this.ctx || (this.owner && (this.owner.mountHooks || this.owner.name) ? this.owner : null) || getCurrentContext();
             const handled = reportGlobalError(err, { type: "effect", ctx: effectCtx, owner: this });
             if (!handled) {
                 throw err;

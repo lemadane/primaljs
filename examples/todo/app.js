@@ -53,12 +53,12 @@ function TodoApp() {
 
             <ul class="todo-list">
                 ${() => todos.value.map(item => html`
-                    <li class="todo-item ${item.done ? "completed" : ""}">
+                    <li key=${item.id} class="todo-item ${item.done ? "completed" : ""}">
                         <label style="display: flex; align-items: center; gap: 10px; cursor: pointer; flex: 1;">
                             <input
                                 type="checkbox"
                                 checked=${item.done}
-                                onchange=${() => toggleTodo(item.id)}
+                                onclick=${(e) => { e.stopPropagation(); toggleTodo(item.id); }}
                             />
                             <span>${item.text}</span>
                         </label>

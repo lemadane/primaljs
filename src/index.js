@@ -16,4 +16,5 @@ export { activate } from "./activate.js";
 export { setupPwa, unregisterServiceWorkers } from "./pwa.js";
 export { createApp } from "./app.js";
 export { Boundary } from "./boundary.js";
+export { Wait, Delay, Briefly, Failed } from "./async.js";
 export { PrimalJSError, setDevMode } from "./diagnostics.js";

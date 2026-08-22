@@ -84,4 +84,41 @@ describe("PrimalJS Keyed List DOM Reconciliation & Identity Suite", () => {
         assert.equal(spans[1].getAttribute("data-id"), "10");
         assert.ok(spans[1] === firstSpanA, "Span A reference identity preserved after reorder");
     });
+
+    it("3. executes event handler EXACTLY ONCE after 20 consecutive list reconciliations", () => {
+        let clickCount = 0;
+        const listSignal = signal([
+            { id: 100, label: "Item 100" }
+        ]);
+
+        function ListWithEvents() {
+            return html`
+                <div>
+                    ${() => listSignal.value.map(item => html`
+                        <div key=${item.id} class="item">
+                            <button class="btn-${item.id}" onclick=${() => clickCount++}>Click ${item.label}</button>
+                        </div>
+                    `)}
+                </div>
+            `;
+        }
+
+        mount(ListWithEvents, container);
+
+        const targetBtn = container.querySelector(".btn-100");
+        assert.ok(targetBtn, "Target button must exist initially");
+
+        // Trigger 20 consecutive reconciliations
+        for (let i = 0; i < 20; i++) {
+            listSignal.value = [
+                { id: 100, label: `Item 100 (Pass ${i})` }
+            ];
+        }
+
+        // Click preserved button
+        targetBtn.click();
+
+        // Assert event handler executed EXACTLY ONCE
+        assert.equal(clickCount, 1, "Click handler must execute EXACTLY ONCE despite 20 list reconciliations");
+    });
 });
