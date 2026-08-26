@@ -1,6 +1,6 @@
 {
   "name": "primaljs",
-  "version": "0.4.1-beta",
+  "version": "0.4.2-beta",
   "description": "Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real DOM Updates, No Virtual DOM, No Compiler.",
   "type": "module",
   "main": "src/index.js",
@@ -27,7 +27,7 @@
   },
   "scripts": {
     "build": "node scripts/build-standalone.js",
-    "test": "node --test test/activate.test.js test/animate.test.js test/async_resource.test.js test/attribute_interpolation.test.js test/batch_untrack.test.js test/boundary.test.js test/cleanup.test.js test/component.test.js test/component_execution.test.js test/computed_ownership.test.js test/create_app_error_boundary.test.js test/diagnostics_global_error.test.js test/dom_helpers.test.js test/dom_identity.test.js test/focus.test.js test/global_error_boundary_wiring.test.js test/global_integration.test.js test/head_api.test.js test/hydrate.test.js test/keep.test.js test/keyed_list_reconciliation.test.js test/mount_activate_exception_safety.test.js test/mount_context.test.js test/on_idle.test.js test/place.test.js test/pwa_hardening.test.js test/root_disposal.test.js test/router_error_handling.test.js test/router_nested.test.js test/router_single_execution.test.js test/security_escaping.test.js test/signal.test.js test/stabilization_fixes.test.js test/standalone_bundle.test.js test/svg_custom_elements.test.js test/within_view.test.js",
+    "test": "node --test test/activate.test.js test/animate.test.js test/async_resource.test.js test/attribute_interpolation.test.js test/batch_untrack.test.js test/boundary.test.js test/cleanup.test.js test/component.test.js test/component_composition.test.js test/component_execution.test.js test/computed_ownership.test.js test/create_app_error_boundary.test.js test/diagnostics_global_error.test.js test/dom_helpers.test.js test/dom_identity.test.js test/focus.test.js test/global_error_boundary_wiring.test.js test/global_integration.test.js test/head_api.test.js test/hydrate.test.js test/keep.test.js test/keyed_list_reconciliation.test.js test/mount_activate_exception_safety.test.js test/mount_context.test.js test/on_idle.test.js test/place.test.js test/pwa_hardening.test.js test/root_disposal.test.js test/router_error_handling.test.js test/router_nested.test.js test/router_single_execution.test.js test/security_escaping.test.js test/signal.test.js test/stabilization_fixes.test.js test/standalone_bundle.test.js test/svg_custom_elements.test.js test/within_view.test.js",
     "test:unit": "npm test",
     "test:e2e": "node --test test/e2e.test.js && node --test test/cross_browser_e2e.test.js",
     "test:e2e:cross": "node --test test/cross_browser_e2e.test.js"

@@ -1271,4 +1271,50 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
 
         await context.close();
     });
+
+    it("runs component composition example (examples/component-composition) testing prop forwarding, subcomponent events, signals, and slotted children", async () => {
+        const context = await browser.newContext();
+        const page = await context.newPage();
+
+        await page.goto(`http://localhost:${port}/examples/component-composition/index.html`, { waitUntil: "domcontentloaded" });
+
+        // 1. Initial Render Verification
+        const titleText = await page.locator(".header-banner h1").textContent();
+        assert.equal(titleText.trim(), "Component Composition Demo");
+
+        const activeBadgeText = await page.locator(".header-banner .badge").textContent();
+        assert.ok(activeBadgeText.includes("Active Users: 2"));
+
+        let userCards = page.locator(".user-card");
+        assert.equal(await userCards.count(), 3);
+
+        // 2. Inter-component Event & Signal Propagation (Toggle status on user 1)
+        const firstUserToggleBtn = page.locator("#user-1 .btn-secondary");
+        await firstUserToggleBtn.click();
+        await page.waitForTimeout(50);
+
+        const updatedBadgeText = await page.locator(".header-banner .badge").textContent();
+        assert.ok(updatedBadgeText.includes("Active Users: 1"));
+
+        const user1Badge = page.locator("#user-1 .badge");
+        assert.equal((await user1Badge.textContent()).trim(), "inactive");
+
+        // 3. Inter-component Addition (Add New User)
+        await page.click("#add-user-btn");
+        await page.waitForTimeout(50);
+
+        assert.equal(await userCards.count(), 4);
+        const newBadgeText = await page.locator(".header-banner .badge").textContent();
+        assert.ok(newBadgeText.includes("Active Users: 2"));
+
+        // 4. Inter-component Deletion (Remove user 1)
+        const user1DeleteBtn = page.locator("#user-1 .btn-danger");
+        await user1DeleteBtn.click();
+        await page.waitForTimeout(50);
+
+        assert.equal(await userCards.count(), 3);
+
+        await context.close();
+    });
 });
+

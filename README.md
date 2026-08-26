@@ -2,7 +2,7 @@
 
 > **The Super Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Typescript, No Babel, No JSX, No Compiler, No Virtual DOM, No Re-Render.**
 
-PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and component framework currently in beta (`v0.4.1-beta`). Built directly on modern browser APIs, PrimalJS brings web development back to its fundamentals — **JavaScript stays JavaScript**.
+PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and component framework currently in beta (`v0.4.2-beta`). Built directly on modern browser APIs, PrimalJS brings web development back to its fundamentals — **JavaScript stays JavaScript**.
 
 ---
 
@@ -29,6 +29,7 @@ PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and com
   - [`effect()`, `batch()`, `untrack()` — Side Effects & Sync](#effect-batch-untrack--side-effects--sync)
   - [`ref()` — Direct DOM Element References](#ref--direct-dom-element-references)
 - [Reactive Control Flow & Keyed List Reconciliation](#reactive-control-flow--keyed-list-reconciliation)
+- [Component Composition & Custom Components](#component-composition--custom-components)
 - [Declarative Lifecycle Components](#declarative-lifecycle-components)
   - [`<Focus>` — Manage Keyboard Focus & Trapping](#focus--manage-keyboard-focus--trapping)
   - [`<OnIdle>` — Defer Mount Until Idle Time](#onidle--defer-mount-until-idle-time)
@@ -281,6 +282,71 @@ Because component functions execute **ONLY ONCE** (`executions === 1`), standard
 
 ### Keyed List DOM Reconciliation
 Dynamic lists `${() => list.value.map(...)}` use item keys (`key=${item.id}`) to reconcile real DOM nodes in-place — preserving input focus, selection, and component state during array mutations.
+
+---
+
+## Component Composition & Custom Components
+
+PrimalJS function components can easily be nested and reused inside other PrimalJS components. Because PrimalJS uses standard JavaScript without JSX compilers, components are regular functions returning `html` tagged templates.
+
+### 1. Registering Custom Components (`register()`)
+
+To use upper-case component tag syntax (e.g. `<UserCard user=${u} />` or `<Button variant="primary">Click</Button>`) inside `html` templates, register your component functions with `register()`:
+
+```javascript
+import { html, signal, register, mount } from "primaljs";
+
+// 1. Leaf Subcomponent
+function Button(props) {
+    return html`
+        <button class="btn btn-${props.variant || 'default'}" onclick=${props.onclick}>
+            ${props.children}
+        </button>
+    `;
+}
+
+// 2. Composite Subcomponent using <Button>
+function UserCard(props) {
+    return html`
+        <div class="user-card">
+            <h3>${props.name}</h3>
+            <Button variant="danger" onclick=${props.onDelete}>
+                Delete User
+            </Button>
+        </div>
+    `;
+}
+
+// 3. Register components before mounting
+register(Button, UserCard);
+
+// 4. Top-Level Parent Component using <UserCard>
+function App() {
+    const user = signal({ id: 1, name: "Lemuel Adane" });
+
+    return html`
+        <main>
+            <UserCard
+                name=${user.value.name}
+                onDelete=${() => console.log("Deleted")}
+            />
+        </main>
+    `;
+}
+
+mount(App, "#app");
+```
+
+### 2. Props, Callbacks & Slotted Children (`props.children`)
+
+When a parent component renders a child component via XML tag syntax `<MyComponent prop=${value}>Children</MyComponent>`:
+
+- **Attributes to Props**: Attributes like `name=${val}` or `variant="primary"` are passed as properties in the `props` object.
+- **Event Callbacks**: Pass functions as props (e.g. `onDelete=${handleDelete}`) to communicate from child back to parent.
+- **Slotted Content (`props.children`)**: Nested content inside component tags is passed as `props.children`.
+- **Reactive Signals**: Signals passed as props (e.g. `count=${countSignal}`) dynamically update child DOM bindings without re-executing component functions.
+
+See [examples/component-composition](file:///home/lem/Projects/js/primaljs/examples/component-composition) for a complete working example with modern styles.
 
 ---
 

@@ -379,7 +379,10 @@ export function activateTemplate(existingDOMNode, templateResult, ctx = getCurre
         } else if (spec.type === "attribute") {
             bindAttribute(targetNode, spec.attrName, val, ctx, spec.prefix, spec.suffix, spec.parts, templateResult.values);
         } else if (spec.type === "component") {
-            instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, ctx, cached.capitalTags);
+            const isPlaceholder = targetNode.hasAttribute && (targetNode.hasAttribute("primal-comp") || (cached.capitalTags && cached.capitalTags.has(targetNode.nodeName)));
+            if (isPlaceholder && !targetNode._primalInstantiated) {
+                instantiateComponentNode(targetNode, spec.componentFn, templateResult.values, ctx, cached.capitalTags);
+            }
         }
     }
 }
@@ -607,7 +610,8 @@ function createValueNode(value, ctx) {
             const cTags = (ctx && ctx.capitalTags) ? ctx.capitalTags : new Set();
             const tagUpper = value.nodeName.toUpperCase();
             const cleanTagName = value.getAttribute("primal-comp") || value.nodeName.replace(/-COMPONENT$/i, "");
-            if (getComponent(cleanTagName) || getComponent(tagUpper) || value.hasAttribute("primal-comp")) {
+            const isComp = getComponent(cleanTagName) || getComponent(tagUpper) || value.hasAttribute("primal-comp");
+            if (isComp) {
                 const cleanName = value.getAttribute("primal-comp") || value.nodeName.replace(/-COMPONENT$/i, "");
                 const subComp = getComponent(cleanName);
                 if (subComp) {
@@ -622,26 +626,8 @@ function createValueNode(value, ctx) {
                     }
                     return frag;
                 }
-            }
-            const subComps = Array.from(value.querySelectorAll("*")).filter(el => {
-                const cleanName = el.getAttribute("primal-comp") || el.nodeName.replace(/-COMPONENT$/i, "");
-                if (!getComponent(cleanName)) return false;
-                let parent = el.parentElement;
-                while (parent && parent !== value) {
-                    const parentClean = parent.getAttribute("primal-comp") || parent.nodeName.replace(/-COMPONENT$/i, "");
-                    if (getComponent(parentClean)) {
-                        return false;
-                    }
-                    parent = parent.parentElement;
-                }
-                return true;
-            });
-            for (const el of subComps) {
-                const compName = el.getAttribute("primal-comp") || el.nodeName.replace(/-COMPONENT$/i, "");
-                const subComp = getComponent(compName);
-                if (subComp) {
-                    instantiateComponentNode(el, subComp, tValues, ctx, cTags);
-                }
+            } else {
+                resolveInnerSubtree(value, tValues, ctx, cTags);
             }
         }
         return value;
@@ -983,7 +969,8 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
 
     if (rootNode.nodeType === Node.ELEMENT_NODE) {
         const cleanName = rootNode.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
-        if (!capitalTags.has(cleanName) && !getComponent(cleanName) && !rootNode.hasAttribute("primal-comp")) {
+        const isCompPlaceholder = (capitalTags && capitalTags.has(cleanName)) || rootNode.hasAttribute("primal-comp") || rootNode.nodeName.endsWith("-COMPONENT");
+        if (!isCompPlaceholder) {
             for (let i = rootNode.attributes.length - 1; i >= 0; i--) {
                 const attr = rootNode.attributes[i];
                 if (attr.name.startsWith("primal-attr-")) {
@@ -1014,7 +1001,8 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
             }
         } else if (node.nodeType === Node.ELEMENT_NODE) {
             const cleanName = node.nodeName.replace(/-COMPONENT$/i, "").toUpperCase();
-            if (capitalTags.has(cleanName) || getComponent(cleanName) || node.hasAttribute("primal-comp")) {
+            const isCompPlaceholder = (capitalTags && capitalTags.has(cleanName)) || node.hasAttribute("primal-comp") || node.nodeName.endsWith("-COMPONENT");
+            if (isCompPlaceholder) {
                 const compFn = getComponent(cleanName);
                 if (compFn) {
                     instantiateComponentNode(node, compFn, templateValues, ctx, capitalTags);
@@ -1026,7 +1014,7 @@ export function resolveInnerSubtree(rootNode, templateValues, ctx, capitalTags =
                 if (attr.name.startsWith("primal-attr-")) {
                     const idx = parseInt(attr.name.replace("primal-attr-", ""), 10);
                     const targetAttrName = attr.value;
-                    const val = templateValues[idx];
+                    const val = templateValues ? templateValues[idx] : undefined;
                     if (targetAttrName.toLowerCase().startsWith("on")) {
                         bindEvent(node, targetAttrName, val, ctx);
                     } else {
