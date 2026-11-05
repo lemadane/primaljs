@@ -527,7 +527,7 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
 
         await page.goto(`http://localhost:${port}/examples/hello/index.html`, { waitUntil: "domcontentloaded" });
 
-        await page.evaluate(async () => {
+        const initialState = await page.evaluate(async () => {
             document.body.innerHTML = `<div id="app"></div>`;
 
             const { html, signal, mount, OnIdle, register } = await import("../../primal.js");
@@ -558,18 +558,22 @@ describe("PrimalJS End-to-End (E2E) Browser Suite", () => {
 
             register(Recommendations, App);
             window.__appHandle = mount(App, "#app");
-        });
 
-        // Immediately check that fallback is present and recommendations is NOT present
-        const initialState = await page.evaluate(() => ({
-            hasFallback: Boolean(document.querySelector("#e2e-idle-fallback")),
-            hasRecs: Boolean(document.querySelector("#e2e-recommendations"))
-        }));
+            // Capture synchronously before yielding to the browser's idle callbacks.
+            // A second page.evaluate() could run after legitimate idle activation.
+            return {
+                hasFallback: Boolean(document.querySelector("#e2e-idle-fallback")),
+                hasRecs: Boolean(document.querySelector("#e2e-recommendations")),
+                childExecutions: recsMounted
+            };
+        });
 
         assert.equal(initialState.hasFallback, true, "Fallback UI must be present before idle activation");
         assert.equal(initialState.hasRecs, false, "Recommendations must NOT be instantiated before idle activation");
 
-        // Wait for idle activation
+        assert.equal(initialState.childExecutions, 0, "Child must not execute during initial mount");
+
+        // Wait for native idle activation
         await page.waitForSelector("#e2e-recommendations", { timeout: 2000 });
 
         // Verify fallback removed and recommendations mounted
