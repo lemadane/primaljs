@@ -1,6 +1,6 @@
 # PrimalJS
 
-> **The Super Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Typescript, No Babel, No JSX, No Compiler, No Virtual DOM, No Re-Render.**
+> **The Hyper Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real-DOM Updates, No Typescript, No Babel, No JSX, No Compiler, No Virtual DOM, No Re-Render.**
 
 PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and component framework currently in beta (`v0.4.2-beta`). Built directly on modern browser APIs, PrimalJS brings web development back to its fundamentals — **JavaScript stays JavaScript**.
 
