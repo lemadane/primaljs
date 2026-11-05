@@ -244,7 +244,7 @@ const dispose = effect(() => {
     console.log(`User: ${firstName.value} ${untrack(() => lastName.value)}`);
 });
 
-// Atomic multi-signal update (notifies subscribers once)
+// Defer dependent effects until the outermost batch finishes
 batch(() => {
     firstName.value = "Google";
     lastName.value = "Antigravity";
@@ -252,6 +252,21 @@ batch(() => {
 
 dispose(); // Unsubscribes effect
 ```
+
+`batch()` applies signal writes immediately and defers dependent effects until the outermost batch finishes. Computed values stay current when read inside a batch, including chains of computeds. An effect that reads both a signal and a computed derived from it runs once after the batch with consistent values.
+
+```javascript
+const count = signal(1);
+const doubled = computed(() => count.value * 2);
+
+batch(() => {
+    count.value = 2;
+    console.log(doubled.value); // 4, even before the batch finishes
+});
+```
+
+Import `computed` from `"primaljs"` for this example.
+
 
 ### `ref()` — Direct DOM Element References
 
@@ -629,21 +644,31 @@ function Dropdown() {
 import { createRouter, RouteOutlet, html, mount } from "primaljs";
 import { HomePage, AboutPage, UserPage } from "./pages.js";
 
-const router = createRouter([
-    { path: "/", component: HomePage },
-    { path: "/about", component: AboutPage },
-    { path: "/users/:id", component: UserPage }
-]);
+const router = createRouter({
+    routes: [
+        { path: "/", component: HomePage },
+        { path: "/about", component: AboutPage },
+        { path: "/users/:id", component: UserPage }
+    ]
+});
 
 function App() {
     return html`
-        <nav><a href="/">Home</a> | <a href="/about">About</a></nav>
-        <main><RouteOutlet router=${router} /></main>
+        <nav>${router.link({ href: "/", children: "Home" })} | ${router.link({ href: "/about", children: "About" })}</nav>
+        <main><RouteOutlet /></main>
     `;
 }
 
 mount(App, "#app");
 ```
+
+Routes can define a synchronous or asynchronous `beforeEnter` guard. Return `false` to cancel navigation, a path string to redirect, or `true` (or nothing) to continue:
+
+```javascript
+{ path: "/users/:id", component: UserPage, beforeEnter: () => isSignedIn() }
+```
+
+When a guard cancels navigation, the router restores the previous route URL, including its query parameters and fragment. With `mode: "hash"`, it restores the route inside the URL hash and preserves the outer pathname and query string.
 
 ### `head()` — Dynamic Head Metadata
 
@@ -690,7 +715,7 @@ PrimalJS enforces strict architectural guarantees across its test suite:
 ### Test Suite Execution
 
 ```bash
-# Run full unit test suite (171 / 171 passing)
+# Run the configured unit test suite
 npm test
 
 # Run Playwright E2E browser suite (18 / 18 passing)

@@ -15,7 +15,7 @@ Because PrimalJS exports pure standard JavaScript ES modules with JSDoc metadata
 ### Reactivity Autocompletion
 
 ```js
-import { signal, computed, effect } from "primaljs";
+import { signal, computed, effect, batch } from "primaljs";
 
 // Signal autocompletion & generic type inference
 const user = signal({
@@ -31,6 +31,13 @@ console.log(user.value.name); // string IntelliSense
 const userGreeting = computed(() => `Hello, ${user.value.name}!`);
 console.log(userGreeting.value.toUpperCase()); // String method completions
 
+// Computed return types also remain available inside a batch.
+// Reads reflect the latest write before deferred effects run.
+batch(() => {
+    user.value = { ...user.value, name: "Ada" };
+    console.log(userGreeting.value.toUpperCase()); // "HELLO, ADA!"
+});
+
 // Reactive side-effects recognize return disposer
 const dispose = effect(() => {
     console.log("Current user:", user.value.name);
@@ -43,6 +50,8 @@ dispose(); // Autocompleted function
 Annotate component function props using JSDoc:
 
 ```js
+import { html } from "primaljs";
+
 /**
  * @typedef {Object} UserCardProps
  * @property {string} name User's full name.

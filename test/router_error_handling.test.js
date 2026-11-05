@@ -196,3 +196,21 @@ describe("PrimalJS Router Promise & Error Handling Hardening", () => {
         assert.equal(document.querySelector('meta[name="description"]'), null);
     });
 });
+
+for (const mode of ["history", "hash"]) {
+    it(`cancelled ${mode} navigation restores query and fragment`, async () => {
+        const router = createRouter({ mode, routes: [
+            { path: "/ok", component: () => null },
+            { path: "/blocked", beforeEnter: () => false, component: () => null }
+        ] });
+        try {
+            await router.resolveRoute("/ok", "?tab=2", "#section");
+            window.history.replaceState({}, "", mode === "hash" ? "/shell?outer=1#/blocked" : "/blocked");
+            await router.resolveRoute("/blocked");
+            assert.equal(window.location.pathname + window.location.search + window.location.hash,
+                mode === "hash" ? "/shell?outer=1#/ok?tab=2#section" : "/ok?tab=2#section");
+        } finally {
+            router.destroy();
+        }
+    });
+}

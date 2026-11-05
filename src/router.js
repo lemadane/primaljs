@@ -412,7 +412,13 @@ export class Router {
 
                     if (result === false) {
                         if (typeof window !== "undefined") {
-                            window.history.replaceState({}, "", currentRouteSignal.value.path);
+                            const route = currentRouteSignal.value;
+                            const search = route.query.toString();
+                            const routeUrl = route.path + (search ? "?" + search : "") + route.hash;
+                            const restoreUrl = this.mode === "hash"
+                                ? window.location.pathname + window.location.search + "#" + routeUrl
+                                : routeUrl;
+                            window.history.replaceState({}, "", restoreUrl);
                         }
                         return;
                     }

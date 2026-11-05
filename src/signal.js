@@ -120,7 +120,7 @@ export class Signal {
                 this.subscribers.delete(sub);
                 continue;
             }
-            if (batchDepth > 0) {
+            if (batchDepth > 0 && !sub.isComputedInvalidator) {
                 pendingNotifyEffects.add(sub);
             } else {
                 sub.run();
@@ -182,6 +182,7 @@ export class Computed {
         }
 
         this._effect = {
+            isComputedInvalidator: true,
             run: () => {
                 if (this._disposed) return;
                 if (!this._dirty) {
@@ -253,7 +254,7 @@ export class Computed {
                 this.subscribers.delete(sub);
                 continue;
             }
-            if (batchDepth > 0) {
+            if (batchDepth > 0 && !sub.isComputedInvalidator) {
                 pendingNotifyEffects.add(sub);
             } else {
                 sub.run();

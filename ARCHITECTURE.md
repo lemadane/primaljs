@@ -39,19 +39,22 @@ Application Root Owner (MountedApp)
 ## 3. Reactivity & Advanced Controls
 
 ```text
-Signal / Computed Write
+Signal Write
+        ↓
+Invalidate dependent computeds immediately (including computed chains)
         ↓
     batch(fn)?
-   ├── Depth > 0: Accumulate subscribers in deduplicated batch queue
-   └── Depth === 0: Flush all subscribers immediately
+   ├── Depth > 0: Queue dependent effects in a deduplicated Set
+   │                Run when the outermost batch finishes
+   └── Depth === 0: Run dependent effects immediately
         ↓
 Micro-Mutation on target Text / Attribute / Property
 ```
 
 - **Signals (`signal(val)`)**: Fine-grained reactive values.
-- **Computed (`computed(fn)`)**: Auto-tracked derived values.
+- **Computed (`computed(fn)`)**: Auto-tracked derived values. Dependency changes mark cached values dirty immediately, including during a batch; reading a dirty computed recalculates it on demand.
 - **Effects (`effect(fn)`)**: Auto-tracked reactive side-effects with optional cleanup returns.
-- **`batch(fn)`**: Groups multiple Signal writes into a single subscriber notification pass upon completion of the outermost batch. Handles nesting and `try/finally` error recovery.
+- **`batch(fn)`**: Applies Signal writes immediately and defers dependent effects until the outermost batch finishes. Computed invalidators bypass the effect queue so effects reading both a Signal and its derived values receive consistent state in one execution after the batch. Handles nesting and restores batch depth with `try/finally` when the callback throws.
 - **`untrack(fn)`**: Evaluates `fn()` without registering accessed Signals as reactive dependencies. Returns `fn()`'s result cleanly.
 
 ---
@@ -208,6 +211,7 @@ Physical DOM Location:
 ## 13. Client-Side SPA Router & Layout Preservation
 
 - **Native History API**: Built directly on `history.pushState()`, `history.replaceState()`, and `popstate` events.
+- **Navigation Guards (`beforeEnter`)**: Synchronous or asynchronous guards can return `false` to cancel, a path string to redirect, or `true` / `undefined` to continue. Cancellation restores the previous route pathname, query parameters, and fragment. In hash mode, the route is restored inside the URL hash while preserving the outer pathname and query string.
 - **Nested Routes & Layouts**: Route hierarchy support (`children: [...]`) and declarative `<RouteOutlet>` placeholder.
 - **Layout DOM Preservation**: Navigating child routes (e.g. `/dashboard/users` -> `/dashboard/settings`) keeps parent layout DOM instances and component state 100% untouched. Only the `<RouteOutlet>` owned region is updated!
 - **SEO & Head Metadata (`head()`)**: Dynamically updates `<title>`, `<meta name="description">`, `<meta name="robots">`, `<link rel="canonical">`, OpenGraph tags, and JSON-LD structured data (`<script type="application/ld+json">`).
@@ -242,3 +246,13 @@ PrimalJS DOM helpers provide explicit JavaScript APIs to automate owner lifecycl
 - **`onKey()`**: Listens to keyboard events on `document` or scoped targets (`Element`, `ref`), filtering key codes, modifier keys (`ctrl`, `shift`, `alt`, `meta`), and editable input elements (`ignoreEditable`). Listener detaches automatically on owner context disposal.
 - **`scrollLock()`**: Reference-counted (`lockCount`) scroll locker preventing page scrolling while preserving inline `overflow` styles and scrollbar layout width offsets. Unlocks automatically on owner context disposal.
 - **`onOutsideClick()`**: Detects pointer interactions outside single or array targets (`[triggerRef, menuRef]`) using `composedPath()` in capture phase, enabling seamless outside-click handling for `<Place>` portals. Listener detaches automatically on owner context disposal.
+
+
+---
+
+## 17. Regression Verification
+
+Run `npm test` for the configured unit suite and `npm run build` to regenerate standalone bundles after source changes.
+
+- **Batched Computed Consistency** (`test/batch_untrack.test.js`): Reads through computed chains stay current inside a batch. Effects depending on both source and derived values run once after the batch with the final values.
+- **Cancelled Navigation URL Restoration** (`test/router_error_handling.test.js`): Rejected navigation preserves the previous route query and fragment in history and hash modes, including the outer pathname and query in hash mode.

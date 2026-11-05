@@ -116,3 +116,20 @@ describe("PrimalJS Reactivity Enhancements (batch & untrack)", () => {
         assert.equal(res, "a-b");
     });
 });
+
+it("batch invalidates computed chains immediately and deduplicates mixed dependencies", () => {
+    const source = signal(1);
+    const doubled = computed(() => source.value * 2);
+    const derived = computed(() => doubled.value + 1);
+    const seen = [];
+    const stop = effect(() => seen.push([source.value, derived.value]));
+    batch(() => {
+        source.value = 2;
+        assert.equal(derived.value, 5);
+        source.value = 3;
+        assert.equal(derived.value, 7);
+        assert.equal(seen.length, 1);
+    });
+    assert.deepEqual(seen, [[1, 3], [3, 7]]);
+    stop();
+});
