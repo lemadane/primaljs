@@ -47,7 +47,7 @@ const modules = [
     "index.js"
 ];
 
-let bundledCode = `/**\n * PrimalJS Standalone Browser ES Module (Zero-Build Bundle)\n * Author: Lemuel Adane | Code: Google Antigravity | QA: ChatGPT\n */\n\n`;
+let bundledCode = `/**\n * PrimalJS Standalone Browser ES Module (Zero-Build Bundle)\n * Credits\n * Creator and designer: Lemuel Adane\n * Development assistance: Codex\n * Testing and quality assurance assistance: ChatGPT\n */\n\n`;
 
 for (const modFile of modules) {
     const filePath = path.join(srcDir, modFile);

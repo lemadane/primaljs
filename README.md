@@ -6,10 +6,11 @@ PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and com
 
 ---
 
-### **Credits & Attribution**
-- **Authored & Designed by:** Lemuel Adane
-- **Coded & Architecture by:** Google Antigravity
-- **Product Tested & QA by:** ChatGPT
+### Credits
+
+- **Creator and designer:** Lemuel Adane
+- **Development assistance:** Codex
+- **Testing and quality assurance assistance:** ChatGPT
 
 ---
 
@@ -247,7 +248,7 @@ const dispose = effect(() => {
 // Defer dependent effects until the outermost batch finishes
 batch(() => {
     firstName.value = "Google";
-    lastName.value = "Antigravity";
+    lastName.value = "Codex";
 });
 
 dispose(); // Unsubscribes effect
