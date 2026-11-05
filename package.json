@@ -1,6 +1,6 @@
 {
   "name": "@lemadane/primaljs",
-  "version": "0.4.2-beta",
+  "version": "0.4.3-beta",
   "description": "Minimalists’ ReactJS — Pure JS, Function Components, Tagged Templates, Signals, Direct Real DOM Updates, No Virtual DOM, No Compiler.",
   "type": "module",
   "main": "src/index.js",
