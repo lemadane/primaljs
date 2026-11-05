@@ -747,3 +747,8 @@ For guidance on separating business rules, use cases, storage adapters, and Prim
 
 
 For component-level guidance, see [SOLID component design](docs/SOLID_COMPONENTS.md) and its [runnable editor example](examples/solid-components/). The example uses small callback props, interchangeable storage adapters, and shared contract tests. These patterns are optional; adopt them where they improve reuse and testing.
+
+
+## Publishing
+
+The npm package is [@lemadane/primaljs](https://www.npmjs.com/package/@lemadane/primaljs). Maintainers can publish subsequent versions through GitHub releases using npm trusted publishing. See the [publishing guide](docs/PUBLISHING.md) for the one-time npm configuration, release tags, and beta/stable channels.
