@@ -68,11 +68,11 @@ PrimalJS is a zero-dependency, lightweight Single Page Application (SPA) and com
 ### Option A: NPM Package
 
 ```bash
-npm install primaljs
+npm install @lemadane/primaljs@beta
 ```
 
 ```javascript
-import { html, signal, mount } from "primaljs";
+import { html, signal, mount } from "@lemadane/primaljs";
 
 function Counter() {
     const count = signal(0);
@@ -141,10 +141,10 @@ Both files exist independently in `dist/` (and mirrored as `./primal.js` and `./
    - **NPM Package Import**:
      ```javascript
      // Standard ES import
-     import { signal, html, mount } from "primaljs";
+     import { signal, html, mount } from "@lemadane/primaljs";
 
      // Production minified ES module import
-     import { signal, html, mount } from "primaljs/min";
+     import { signal, html, mount } from "@lemadane/primaljs/min";
      ```
    - **Zero-Build Static HTML Import**:
      ```html
@@ -174,7 +174,7 @@ PrimalJS provides two distinct runtime APIs for initializing applications:
 ### `mount()` — Create & Mount New DOM
 
 ```javascript
-import { mount, html, signal } from "primaljs";
+import { mount, html, signal } from "@lemadane/primaljs";
 
 function App() {
     const count = signal(0);
@@ -189,7 +189,7 @@ const app = mount(App, "#app");
 `hydrate()` attaches PrimalJS reactivity, event listeners, refs, and `ComponentContext` ownership directly to compatible DOM already present in the browser:
 
 ```javascript
-import { hydrate, html, signal } from "primaljs";
+import { hydrate, html, signal } from "@lemadane/primaljs";
 
 // Existing browser HTML: <div id="app"><button id="counter">Count: 0</button></div>
 function Counter() {
@@ -208,7 +208,7 @@ const app = hydrate(Counter, "#app");
 ### `unmount()` — Clean Application Teardown
 
 ```javascript
-import { unmount } from "primaljs";
+import { unmount } from "@lemadane/primaljs";
 
 // Disposes all effects, event listeners, and lifecycle hooks
 unmount("#app");
@@ -221,7 +221,7 @@ unmount("#app");
 ### `signal()` & `computed()` — Reactive State
 
 ```javascript
-import { signal, computed } from "primaljs";
+import { signal, computed } from "@lemadane/primaljs";
 
 const count = signal(0);
 const double = computed(() => count.value * 2);
@@ -234,7 +234,7 @@ console.log(double.value); // 10
 ### `effect()`, `batch()`, `untrack()` — Side Effects & Sync
 
 ```javascript
-import { signal, effect, batch, untrack } from "primaljs";
+import { signal, effect, batch, untrack } from "@lemadane/primaljs";
 
 const firstName = signal("Lemuel");
 const lastName = signal("Adane");
@@ -265,13 +265,13 @@ batch(() => {
 });
 ```
 
-Import `computed` from `"primaljs"` for this example.
+Import `computed` from `"@lemadane/primaljs"` for this example.
 
 
 ### `ref()` — Direct DOM Element References
 
 ```javascript
-import { html, ref, onMount } from "primaljs";
+import { html, ref, onMount } from "@lemadane/primaljs";
 
 function AutoFocusInput() {
     const inputRef = ref();
@@ -309,7 +309,7 @@ PrimalJS function components can easily be nested and reused inside other Primal
 To use upper-case component tag syntax (e.g. `<UserCard user=${u} />` or `<Button variant="primary">Click</Button>`) inside `html` templates, register your component functions with `register()`:
 
 ```javascript
-import { html, signal, register, mount } from "primaljs";
+import { html, signal, register, mount } from "@lemadane/primaljs";
 
 // 1. Leaf Subcomponent
 function Button(props) {
@@ -390,7 +390,7 @@ PrimalJS control flow remains pure JavaScript (`if`, `switch`, `.map()`, `ternar
 Manages accessibility, keyboard focus trapping, and focus restoration for modals, dialogs, drawers, and menus:
 
 ```javascript
-import { html, signal, Place, Focus } from "primaljs";
+import { html, signal, Place, Focus } from "@lemadane/primaljs";
 
 function App() {
     const open = signal(false);
@@ -426,7 +426,7 @@ function App() {
 Delays creation and mounting of non-critical child subtrees until the browser has idle scheduling time (`requestIdleCallback`):
 
 ```javascript
-import { html, OnIdle } from "primaljs";
+import { html, OnIdle } from "@lemadane/primaljs";
 import { RecommendationsWidget } from "./widgets.js";
 
 function Page() {
@@ -454,7 +454,7 @@ function Page() {
 Preserves previously mounted component instances and DOM subtrees in an internal LRU cache instead of destroying them:
 
 ```javascript
-import { html, signal, Keep, Load } from "primaljs";
+import { html, signal, Keep, Load } from "@lemadane/primaljs";
 import { DashboardTab, SettingsTab } from "./tabs.js";
 
 const currentTab = signal(DashboardTab);
@@ -479,7 +479,7 @@ function App() {
 Coordinates visual CSS enter/leave animations with component teardown:
 
 ```javascript
-import { html, signal, Animate } from "primaljs";
+import { html, signal, Animate } from "@lemadane/primaljs";
 
 const open = signal(false);
 
@@ -503,7 +503,7 @@ function App() {
 Delays component instantiation until its position approaches the browser viewport (`IntersectionObserver`):
 
 ```javascript
-import { html, WithinView } from "primaljs";
+import { html, WithinView } from "@lemadane/primaljs";
 import { HeavyChart } from "./chart.js";
 
 function Page() {
@@ -523,7 +523,7 @@ function Page() {
 Renders child content into another DOM target (`to="#modal-root"`) while maintaining 100% logical component ownership:
 
 ```javascript
-import { html, Place } from "primaljs";
+import { html, Place } from "@lemadane/primaljs";
 
 function Modal({ children }) {
     return html`
@@ -542,7 +542,7 @@ function Modal({ children }) {
 Dynamically swaps component functions based on a signal or function:
 
 ```javascript
-import { html, signal, Load } from "primaljs";
+import { html, signal, Load } from "@lemadane/primaljs";
 import { UserView, AdminView } from "./views.js";
 
 const role = signal("user");
@@ -560,7 +560,7 @@ function ViewSwitcher() {
 Manage asynchronous operations with `AbortController`, timeouts (`timeout=${5000}`), loading slots (`<Briefly>`), and error boundaries (`<Failed>`):
 
 ```javascript
-import { html, signal, Delay, Briefly, Failed } from "primaljs";
+import { html, signal, Delay, Briefly, Failed } from "@lemadane/primaljs";
 
 const query = signal("search");
 
@@ -583,7 +583,7 @@ function Search() {
 Catches runtime exceptions in child subtrees and renders fallback UI:
 
 ```javascript
-import { html, Guard } from "primaljs";
+import { html, Guard } from "@lemadane/primaljs";
 
 function App() {
     return html`
@@ -603,7 +603,7 @@ PrimalJS provides explicit JavaScript helpers (NOT template tags) that manage br
 ### `onKey()` — Keyboard Event Listener
 
 ```javascript
-import { onKey } from "primaljs";
+import { onKey } from "@lemadane/primaljs";
 
 function Dialog() {
     // Automatically unbinds on component unmount
@@ -615,7 +615,7 @@ function Dialog() {
 ### `scrollLock()` — Reference-Counted Scroll Lock
 
 ```javascript
-import { scrollLock } from "primaljs";
+import { scrollLock } from "@lemadane/primaljs";
 
 function Modal() {
     // Locks body scroll; restores scroll when all active locks reach 0
@@ -626,7 +626,7 @@ function Modal() {
 ### `onOutsideClick()` — Pointer Outside Detection
 
 ```javascript
-import { onOutsideClick } from "primaljs";
+import { onOutsideClick } from "@lemadane/primaljs";
 
 function Dropdown() {
     // Supports array targets [triggerRef, menuRef] across <Place> portals
@@ -641,7 +641,7 @@ function Dropdown() {
 ### SPA Router & Layouts
 
 ```javascript
-import { createRouter, RouteOutlet, html, mount } from "primaljs";
+import { createRouter, RouteOutlet, html, mount } from "@lemadane/primaljs";
 import { HomePage, AboutPage, UserPage } from "./pages.js";
 
 const router = createRouter({
@@ -673,7 +673,7 @@ When a guard cancels navigation, the router restores the previous route URL, inc
 ### `head()` — Dynamic Head Metadata
 
 ```javascript
-import { head } from "primaljs";
+import { head } from "@lemadane/primaljs";
 
 function Page() {
     head({
@@ -691,7 +691,7 @@ function Page() {
 Register service workers and manage offline caches:
 
 ```javascript
-import { setupPwa } from "primaljs";
+import { setupPwa } from "@lemadane/primaljs";
 
 setupPwa({
     scriptUrl: "/sw.js",
@@ -739,3 +739,11 @@ npm run test:e2e:cross
 ## License
 
 [MIT License](LICENSE) © Lemuel Adane & PrimalJS Contributors
+
+
+## Application Architecture
+
+For guidance on separating business rules, use cases, storage adapters, and PrimalJS components, see the [application architecture guide](docs/APPLICATION_ARCHITECTURE.md). The [runnable todo example](examples/clean-architecture/) demonstrates dependency injection through props, JSDoc contracts, framework-independent tests, and import-boundary checks.
+
+
+For component-level guidance, see [SOLID component design](docs/SOLID_COMPONENTS.md) and its [runnable editor example](examples/solid-components/). The example uses small callback props, interchangeable storage adapters, and shared contract tests. These patterns are optional; adopt them where they improve reuse and testing.

@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>PrimalJS — SOLID Components</title>
+</head>
+<body>
+    <main>
+        <h1>A reusable todo editor</h1>
+        <p>The same editor and service work with either storage implementation.</p>
+        <nav aria-label="Storage examples">
+            <a href="?storage=memory">Memory (resets on reload)</a> |
+            <a href="?storage=local">Local storage (persists in this browser)</a>
+        </nav>
+        <p>Saved records are available through the repository; this example focuses on the editor.</p>
+        <div id="app"></div>
+    </main>
+    <script type="module" src="./main.js"></script>
+</body>
+</html>

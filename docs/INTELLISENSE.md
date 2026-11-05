@@ -15,7 +15,7 @@ Because PrimalJS exports pure standard JavaScript ES modules with JSDoc metadata
 ### Reactivity Autocompletion
 
 ```js
-import { signal, computed, effect, batch } from "primaljs";
+import { signal, computed, effect, batch } from "@lemadane/primaljs";
 
 // Signal autocompletion & generic type inference
 const user = signal({
@@ -50,7 +50,7 @@ dispose(); // Autocompleted function
 Annotate component function props using JSDoc:
 
 ```js
-import { html } from "primaljs";
+import { html } from "@lemadane/primaljs";
 
 /**
  * @typedef {Object} UserCardProps
@@ -114,7 +114,7 @@ Inside PrimalJS `html\`...\`` template literals, standard HTML tags, attributes,
 ```json
 {
     "html.customData": [
-        "./node_modules/primaljs/docs/primal-html-data.json"
+        "./node_modules/@lemadane/primaljs/docs/primal-html-data.json"
     ]
 }
 ```
